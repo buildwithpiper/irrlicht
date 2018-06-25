@@ -12,7 +12,7 @@
 #if defined(_IRR_COMPILE_WITH_ANDROID_DEVICE_) || defined(_IRR_COMPILE_WITH_FB_DEVICE_) || defined(_IRR_COMPILE_WITH_WINDOWS_DEVICE_) || defined(__EMSCRIPTEN__)
 #include <EGL/egl.h>
 #else
-#include <GLES/egl.h>
+#include <EGL/egl.h>
 #endif
 
 #include "SIrrCreationParameters.h"

@@ -9,6 +9,17 @@
 #include "irrString.h"
 #include "os.h"
 
+#include "bcm_host.h"
+#define EGL_EGLEXT_PROTOTYPES 1
+#include <EGL/eglext_brcm.h>
+#include <GLES/gl.h>
+
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+
 #if defined(_IRR_COMPILE_WITH_ANDROID_DEVICE_)
 #include <android/native_activity.h>
 #endif
@@ -51,8 +62,10 @@ bool CEGLManager::initialize(const SIrrlichtCreationParameters& params, const SE
 	EglWindow = 0;
 	EglDisplay = eglGetDisplay(EGL_DEFAULT_DISPLAY);
 #elif defined(_IRR_COMPILE_WITH_X11_DEVICE_)
-	EglWindow = (NativeWindowType)Data.OpenGLLinux.X11Window;
-	EglDisplay = eglGetDisplay((NativeDisplayType)Data.OpenGLLinux.X11Display);
+	bcm_host_init();
+	printf("I'm Mr Messeeks Look at me!\n");
+	//EglWindow = (NativeWindowType)Data.OpenGLLinux.X11Window;
+	EglDisplay = eglGetDisplay(EGL_DEFAULT_DISPLAY);
 #elif defined(_IRR_COMPILE_WITH_ANDROID_DEVICE_)
 	EglWindow =	(ANativeWindow*)Data.OGLESAndroid.Window;
 	EglDisplay = eglGetDisplay(EGL_DEFAULT_DISPLAY);
@@ -160,6 +173,7 @@ bool CEGLManager::generateSurface()
 		EGL_NONE, 0
 	};
 
+	printf("Requested bits %d\n", Params.Bits);
 	EglConfig = 0;
 	EGLint NumConfigs = 0;
 	u32 Steps = 5;
@@ -246,6 +260,9 @@ bool CEGLManager::generateSurface()
 	if (Params.Bits > Attribs[9])
 		os::Printer::log("No full color buffer.");
 
+	EglContext = eglCreateContext(EglDisplay, EglConfig, EGL_NO_CONTEXT, NULL);
+	assert(EglContext!=EGL_NO_CONTEXT);
+
 #if defined(_IRR_COMPILE_WITH_ANDROID_DEVICE_)
     EGLint Format = 0;
     eglGetConfigAttrib(EglDisplay, EglConfig, EGL_NATIVE_VISUAL_ID, &Format);
@@ -253,12 +270,81 @@ bool CEGLManager::generateSurface()
     ANativeWindow_setBuffersGeometry(EglWindow, 0, 0, Format);
 #endif
 
+	DISPMANX_DISPLAY_HANDLE_T dispman_display = vc_dispmanx_display_open( 0 /* LCD */);
+	EGL_DISPMANX_WINDOW_T *nativewindow = new EGL_DISPMANX_WINDOW_T;
+
+#ifndef OFF
+	VC_RECT_T dst_rect;
+	VC_RECT_T src_rect;
+	uint32_t screen_w, screen_h;
+
+	assert( 0 <= graphics_get_display_size(0 /* LCD */, &screen_w, &screen_h) );
+	dst_rect.x = 0;
+	dst_rect.y = 0;
+	dst_rect.width = screen_w;
+	dst_rect.height = screen_h;
+
+	src_rect.x = 0;
+	src_rect.y = 0;
+	src_rect.width = screen_w << 16;
+	src_rect.height = screen_h << 16;
+	VC_DISPMANX_ALPHA_T alpha;
+	alpha.flags = DISPMANX_FLAGS_ALPHA_FIXED_ALL_PIXELS;
+	alpha.opacity = 255;
+	DISPMANX_UPDATE_HANDLE_T dispman_update = vc_dispmanx_update_start( 0 );
+	DISPMANX_ELEMENT_HANDLE_T dispman_element = vc_dispmanx_element_add ( dispman_update, dispman_display,
+		0/*layer*/, &dst_rect, 0/*src*/,
+		&src_rect, DISPMANX_PROTECTION_NONE, &alpha /*alpha*/, 0/*clamp*/, DISPMANX_NO_ROTATE/*transform*/);
+
+	vc_dispmanx_update_submit_sync( dispman_update );
+
+	printf("Detected %d x %d\n", screen_w, screen_h);
+	nativewindow->element = dispman_element;
+	nativewindow->width = screen_w;
+	nativewindow->height = screen_h;
+	EglWindow = nativewindow;
 	// Now we are able to create EGL surface.
+
 	EglSurface = eglCreateWindowSurface(EglDisplay, EglConfig, EglWindow, 0);
 
-	if (EGL_NO_SURFACE == EglSurface)
-		EglSurface = eglCreateWindowSurface(EglDisplay, EglConfig, 0, 0);
+	//if (EGL_NO_SURFACE == EglSurface)
+	//	EglSurface = eglCreateWindowSurface(EglDisplay, EglConfig, 0, 0);
+#else
 
+	EGLint rt;
+	EGLint pixel_format = EGL_PIXEL_FORMAT_ARGB_8888_BRCM;
+	eglGetConfigAttrib(EglDisplay, EglConfig, EGL_RENDERABLE_TYPE, &rt);
+	if (rt & EGL_OPENGL_ES_BIT) {
+		pixel_format |= EGL_PIXEL_FORMAT_RENDER_GLES_BRCM;
+		pixel_format |= EGL_PIXEL_FORMAT_GLES_TEXTURE_BRCM;
+	}
+	if (rt & EGL_OPENGL_ES2_BIT) {
+		pixel_format |= EGL_PIXEL_FORMAT_RENDER_GLES2_BRCM;
+		pixel_format |= EGL_PIXEL_FORMAT_GLES2_TEXTURE_BRCM;
+	}
+	if (rt & EGL_OPENVG_BIT) {
+		pixel_format |= EGL_PIXEL_FORMAT_RENDER_VG_BRCM;
+		pixel_format |= EGL_PIXEL_FORMAT_VG_IMAGE_BRCM;
+	}
+	if (rt & EGL_OPENGL_BIT) {
+		pixel_format |= EGL_PIXEL_FORMAT_RENDER_GL_BRCM;
+	}
+
+	EGLint pixmap[5];
+	pixmap[0] = 0;
+	pixmap[1] = 0;
+	pixmap[2] = 640;
+	pixmap[3] = 443;
+	pixmap[4] = pixel_format;
+
+	eglCreateGlobalImageBRCM(pixmap[2], pixmap[3], pixmap[4], 0, pixmap[2]*4, pixmap);
+	if ( pixmap[0] < 0 ) 
+		printf("DirectFB/EGL: eglCreateGlobalImageBRCM() failed! (error = %x)\n", eglGetError() );
+	EglSurface = eglCreatePixmapSurface(EglDisplay, EglConfig, pixmap, 0);
+	if (EglSurface == EGL_NO_SURFACE) {
+		fprintf(stderr, "Unable to create EGL surface (eglError: %x)\n", eglGetError());
+	}
+#endif
 	if (EGL_NO_SURFACE == EglSurface)
 		os::Printer::log("Could not create EGL surface.");
 
@@ -360,7 +446,20 @@ const SExposedVideoData& CEGLManager::getContext() const
 
 bool CEGLManager::swapBuffers()
 {
-    return (eglSwapBuffers(EglDisplay, EglSurface)==EGL_TRUE);
+	/*
+	int nbytes = 640 * 443 * 4;
+	unsigned int * pixbuffer = (unsigned int *)malloc(nbytes);
+	glReadPixels(0, 0, 640, 443, GL_RGBA, GL_UNSIGNED_BYTE, pixbuffer);
+	int fd1=open("/tmp/stuff",O_CREAT | O_WRONLY,S_IRUSR);
+	int r = write(fd1, pixbuffer, nbytes);
+	printf("Wrote %d of %d bytes", r, nbytes);
+	close(fd1);
+	*/
+
+	if ( eglSwapBuffers(EglDisplay, EglSurface) == EGL_TRUE) return true;
+
+	printf("Couldnt swap buffers %x\n", eglGetError());	
+	return false;
 }
 
 bool CEGLManager::testEGLError()

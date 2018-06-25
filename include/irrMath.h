@@ -43,6 +43,7 @@ namespace core
 	//! Rounding error constant often used when comparing f32 values.
 
 	const s32 ROUNDING_ERROR_S32 = 0;
+	const short ROUNDING_ERROR_SHORT = 0;
 
 #ifdef __IRR_HAS_S64
 	const s64 ROUNDING_ERROR_S64 = 0;
@@ -201,6 +202,12 @@ namespace core
 	inline s32 roundingError()
 	{
 		return ROUNDING_ERROR_S32;
+	}
+
+	template <>
+	inline short roundingError()
+	{
+		return ROUNDING_ERROR_SHORT;
 	}
 
 	template <>

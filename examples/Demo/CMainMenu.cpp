@@ -16,7 +16,7 @@ CMainMenu::CMainMenu()
 #endif
 	shadows(true), additive(false), transparent(true), vsync(true), aa(true),
 #ifndef _IRR_WINDOWS_
-	driverType(video::EDT_OPENGL)
+	driverType(video::EDT_OGLES1)
 #else
 	driverType(video::EDT_DIRECT3D9)
 #endif
