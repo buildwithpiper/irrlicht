@@ -24,12 +24,16 @@
 #pragma comment(lib, "SDL.lib")
 #endif // _MSC_VER
 
-static int SDLDeviceInstances = 0;
-
 namespace irr
 {
 	namespace video
 	{
+
+		#ifdef _IRR_COMPILE_WITH_DIRECT3D_8_
+		IVideoDriver* createDirectX8Driver(const irr::SIrrlichtCreationParameters& params,
+			io::IFileSystem* io, HWND window);
+		#endif
+
 		#ifdef _IRR_COMPILE_WITH_DIRECT3D_9_
 		IVideoDriver* createDirectX9Driver(const irr::SIrrlichtCreationParameters& params,
 			io::IFileSystem* io, HWND window);
@@ -59,33 +63,25 @@ CIrrDeviceSDL::CIrrDeviceSDL(const SIrrlichtCreationParameters& param)
 	setDebugName("CIrrDeviceSDL");
 	#endif
 
-	if ( ++SDLDeviceInstances == 1 )
-	{
-		// Initialize SDL... Timer for sleep, video for the obvious, and
-		// noparachute prevents SDL from catching fatal errors.
-		if (SDL_Init( SDL_INIT_TIMER|SDL_INIT_VIDEO|
+	// Initialize SDL... Timer for sleep, video for the obvious, and
+	// noparachute prevents SDL from catching fatal errors.
+	if (SDL_Init( SDL_INIT_TIMER|SDL_INIT_VIDEO|
 #if defined(_IRR_COMPILE_WITH_JOYSTICK_EVENTS_)
-					SDL_INIT_JOYSTICK|
+				SDL_INIT_JOYSTICK|
 #endif
-					SDL_INIT_NOPARACHUTE ) < 0)
-		{
-			os::Printer::log( "Unable to initialize SDL!", SDL_GetError());
-			Close = true;
-		}
-		else
-		{
-			os::Printer::log("SDL initialized", ELL_INFORMATION);
-		}
-
-#if defined(_IRR_WINDOWS_)
-		SDL_putenv("SDL_VIDEODRIVER=directx");
-#elif defined(_IRR_OSX_PLATFORM_)
-		SDL_putenv("SDL_VIDEODRIVER=Quartz");
-#else
-		SDL_putenv("SDL_VIDEODRIVER=x11");
-#endif
+				SDL_INIT_NOPARACHUTE ) < 0)
+	{
+		os::Printer::log( "Unable to initialize SDL!", SDL_GetError());
+		Close = true;
 	}
 
+#if defined(_IRR_WINDOWS_)
+	SDL_putenv("SDL_VIDEODRIVER=directx");
+#elif defined(_IRR_OSX_PLATFORM_)
+	SDL_putenv("SDL_VIDEODRIVER=Quartz");
+#else
+	SDL_putenv("SDL_VIDEODRIVER=x11");
+#endif
 //	SDL_putenv("SDL_WINDOWID=");
 
 	SDL_VERSION(&Info.version);
@@ -99,10 +95,7 @@ CIrrDeviceSDL::CIrrDeviceSDL(const SIrrlichtCreationParameters& param)
 	sdlversion += Info.version.patch;
 
 	Operator = new COSOperator(sdlversion);
-	if ( SDLDeviceInstances == 1 )
-	{
-		os::Printer::log(sdlversion.c_str(), ELL_INFORMATION);
-	}
+	os::Printer::log(sdlversion.c_str(), ELL_INFORMATION);
 
 	// create keymap
 	createKeyMap();
@@ -138,17 +131,12 @@ CIrrDeviceSDL::CIrrDeviceSDL(const SIrrlichtCreationParameters& param)
 //! destructor
 CIrrDeviceSDL::~CIrrDeviceSDL()
 {
-	if ( --SDLDeviceInstances == 0 )
-	{
 #if defined(_IRR_COMPILE_WITH_JOYSTICK_EVENTS_)
-		const u32 numJoysticks = Joysticks.size();
-		for (u32 i=0; i<numJoysticks; ++i)
-			SDL_JoystickClose(Joysticks[i]);
+	const u32 numJoysticks = Joysticks.size();
+	for (u32 i=0; i<numJoysticks; ++i)
+		SDL_JoystickClose(Joysticks[i]);
 #endif
-		SDL_Quit();
-
-		os::Printer::log("Quit SDL", ELL_INFORMATION);
-	}
+	SDL_Quit();
 }
 
 
@@ -230,8 +218,18 @@ void CIrrDeviceSDL::createDriver()
 {
 	switch(CreationParams.DriverType)
 	{
-	case video::DEPRECATED_EDT_DIRECT3D8_NO_LONGER_EXISTS:
-		os::Printer::log("DIRECT3D8 Driver is no longer supported in Irrlicht. Try another one.", ELL_ERROR);
+	case video::EDT_DIRECT3D8:
+		#ifdef _IRR_COMPILE_WITH_DIRECT3D_8_
+
+		VideoDriver = video::createDirectX8Driver(CreationParams, FileSystem, HWnd);
+		if (!VideoDriver)
+		{
+			os::Printer::log("Could not create DIRECT3D8 Driver.", ELL_ERROR);
+		}
+		#else
+		os::Printer::log("DIRECT3D8 Driver was not compiled into this dll. Try another one.", ELL_ERROR);
+		#endif // _IRR_COMPILE_WITH_DIRECT3D_8_
+
 		break;
 
 	case video::EDT_DIRECT3D9:
@@ -446,8 +444,8 @@ bool CIrrDeviceSDL::run()
 
 		case SDL_USEREVENT:
 			irrevent.EventType = irr::EET_USER_EVENT;
-			irrevent.UserEvent.UserData1 = reinterpret_cast<uintptr_t>(SDL_event.user.data1);
-			irrevent.UserEvent.UserData2 = reinterpret_cast<uintptr_t>(SDL_event.user.data2);
+			irrevent.UserEvent.UserData1 = *(reinterpret_cast<s32*>(&SDL_event.user.data1));
+			irrevent.UserEvent.UserData2 = *(reinterpret_cast<s32*>(&SDL_event.user.data2));
 
 			postEventFromUser(irrevent);
 			break;
@@ -619,7 +617,7 @@ void CIrrDeviceSDL::setWindowCaption(const wchar_t* text)
 bool CIrrDeviceSDL::present(video::IImage* surface, void* windowId, core::rect<s32>* srcClip)
 {
 	SDL_Surface *sdlSurface = SDL_CreateRGBSurfaceFrom(
-			surface->getData(), surface->getDimension().Width, surface->getDimension().Height,
+			surface->lock(), surface->getDimension().Width, surface->getDimension().Height,
 			surface->getBitsPerPixel(), surface->getPitch(),
 			surface->getRedMask(), surface->getGreenMask(), surface->getBlueMask(), surface->getAlphaMask());
 	if (!sdlSurface)
@@ -691,6 +689,7 @@ bool CIrrDeviceSDL::present(video::IImage* surface, void* windowId, core::rect<s
 	}
 
 	SDL_FreeSurface(sdlSurface);
+	surface->unlock();
 	return (scr != 0);
 }
 
@@ -752,12 +751,6 @@ void CIrrDeviceSDL::minimizeWindow()
 void CIrrDeviceSDL::maximizeWindow()
 {
 	// do nothing
-}
-
-//! Get the position of this window on screen
-core::position2di CIrrDeviceSDL::getWindowPosition()
-{
-    return core::position2di(-1, -1);
 }
 
 

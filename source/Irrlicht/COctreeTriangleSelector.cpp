@@ -15,9 +15,8 @@ namespace scene
 //! constructor
 COctreeTriangleSelector::COctreeTriangleSelector(const IMesh* mesh,
 		ISceneNode* node, s32 minimalPolysPerNode)
-	: CTriangleSelector(mesh, node, false)
-	, Root(0), NodeCount(0)
-	, MinimalPolysPerNode(minimalPolysPerNode)
+	: CTriangleSelector(mesh, node), Root(0), NodeCount(0),
+	 MinimalPolysPerNode(minimalPolysPerNode)
 {
 	#ifdef _DEBUG
 	setDebugName("COctreeTriangleSelector");
@@ -39,30 +38,6 @@ COctreeTriangleSelector::COctreeTriangleSelector(const IMesh* mesh,
 	}
 }
 
-COctreeTriangleSelector::COctreeTriangleSelector(const IMeshBuffer* meshBuffer, irr::u32 materialIndex, ISceneNode* node, s32 minimalPolysPerNode)
-	: CTriangleSelector(meshBuffer, materialIndex, node)
-	, Root(0), NodeCount(0)
-	, MinimalPolysPerNode(minimalPolysPerNode)
-{
-	#ifdef _DEBUG
-	setDebugName("COctreeTriangleSelector");
-	#endif
-
-	if (!Triangles.empty())
-	{
-		const u32 start = os::Timer::getRealTime();
-
-		// create the triangle octree
-		Root = new SOctreeNode();
-		Root->Triangles = Triangles;
-		constructOctree(Root);
-
-		c8 tmp[256];
-		sprintf(tmp, "Needed %ums to create OctreeTriangleSelector.(%d nodes, %u polys)",
-			os::Timer::getRealTime() - start, NodeCount, Triangles.size());
-		os::Printer::log(tmp, ELL_INFORMATION);
-	}
-}
 
 //! destructor
 COctreeTriangleSelector::~COctreeTriangleSelector()
@@ -136,19 +111,15 @@ void COctreeTriangleSelector::constructOctree(SOctreeNode* node)
 void COctreeTriangleSelector::getTriangles(core::triangle3df* triangles,
 					s32 arraySize, s32& outTriangleCount,
 					const core::aabbox3d<f32>& box,
-					const core::matrix4* transform, bool useNodeTransform, 
-					irr::core::array<SCollisionTriangleRange>* outTriangleInfo) const
+					const core::matrix4* transform) const
 {
 	core::matrix4 mat(core::matrix4::EM4CONST_NOTHING);
 	core::aabbox3d<f32> invbox = box;
 
-	if (SceneNode && useNodeTransform)
+	if (SceneNode)
 	{
-		if ( SceneNode->getAbsoluteTransformation().getInverse(mat) )
-			mat.transformBoxEx(invbox);
-		else
-			// TODO: case not handled well, we can only return all triangles
-			return CTriangleSelector::getTriangles(triangles, arraySize, outTriangleCount, transform, useNodeTransform, outTriangleInfo);
+		SceneNode->getAbsoluteTransformation().getInverse(mat);
+		mat.transformBoxEx(invbox);
 	}
 
 	if (transform)
@@ -156,7 +127,7 @@ void COctreeTriangleSelector::getTriangles(core::triangle3df* triangles,
 	else
 		mat.makeIdentity();
 
-	if (SceneNode && useNodeTransform)
+	if (SceneNode)
 		mat *= SceneNode->getAbsoluteTransformation();
 
 	s32 trianglesWritten = 0;
@@ -164,17 +135,6 @@ void COctreeTriangleSelector::getTriangles(core::triangle3df* triangles,
 	if (Root)
 		getTrianglesFromOctree(Root, trianglesWritten,
 			arraySize, invbox, &mat, triangles);
-
-	if ( outTriangleInfo )
-	{
-		SCollisionTriangleRange triRange;
-		triRange.RangeSize = trianglesWritten;
-		triRange.Selector = const_cast<COctreeTriangleSelector*>(this);
-		triRange.SceneNode = SceneNode;
-		triRange.MeshBuffer = MeshBuffer;
-		triRange.MaterialIndex = MaterialIndex;
-		outTriangleInfo->push_back(triRange);
-	}
 
 	outTriangleCount = trianglesWritten;
 }
@@ -193,7 +153,7 @@ void COctreeTriangleSelector::getTrianglesFromOctree(
 	for (u32 i=0; i<cnt; ++i)
 	{
 		const core::triangle3df& srcTri = node->Triangles[i];
-		// This isn't an accurate test, but it's fast, and the
+		// This isn't an accurate test, but it's fast, and the 
 		// API contract doesn't guarantee complete accuracy.
 		if (srcTri.isTotalOutsideBox(box))
 			continue;
@@ -220,8 +180,7 @@ void COctreeTriangleSelector::getTrianglesFromOctree(
 // new version: from user Piraaate
 void COctreeTriangleSelector::getTriangles(core::triangle3df* triangles, s32 arraySize,
 		s32& outTriangleCount, const core::line3d<f32>& line,
-		const core::matrix4* transform, bool useNodeTransform, 
-		irr::core::array<SCollisionTriangleRange>* outTriangleInfo) const
+		const core::matrix4* transform) const
 {
 #if 0
 	core::aabbox3d<f32> box(line.start);
@@ -235,7 +194,7 @@ void COctreeTriangleSelector::getTriangles(core::triangle3df* triangles, s32 arr
 	core::matrix4 mat ( core::matrix4::EM4CONST_NOTHING );
 
 	core::vector3df vectStartInv ( line.start ), vectEndInv ( line.end );
-	if (SceneNode && useNodeTransform)
+	if (SceneNode)
 	{
 		mat = SceneNode->getAbsoluteTransformation();
 		mat.makeInverse();
@@ -249,24 +208,13 @@ void COctreeTriangleSelector::getTriangles(core::triangle3df* triangles, s32 arr
 	if (transform)
 		mat = (*transform);
 
-	if (SceneNode && useNodeTransform)
+	if (SceneNode)
 		mat *= SceneNode->getAbsoluteTransformation();
 
 	s32 trianglesWritten = 0;
 
 	if (Root)
 		getTrianglesFromOctree(Root, trianglesWritten, arraySize, invline, &mat, triangles);
-
-	if ( outTriangleInfo )
-	{
-		SCollisionTriangleRange triRange;
-		triRange.RangeSize = trianglesWritten;
-		triRange.Selector = const_cast<COctreeTriangleSelector*>(this);
-		triRange.SceneNode = SceneNode;
-		triRange.MeshBuffer = MeshBuffer;
-		triRange.MaterialIndex = MaterialIndex;
-		outTriangleInfo->push_back(triRange);
-	}
 
 	outTriangleCount = trianglesWritten;
 #endif
@@ -314,3 +262,4 @@ void COctreeTriangleSelector::getTrianglesFromOctree(SOctreeNode* node,
 
 } // end namespace scene
 } // end namespace irr
+

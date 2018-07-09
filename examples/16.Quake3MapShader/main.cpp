@@ -1,6 +1,6 @@
 /** Example 016 Quake3 Map Shader Support
 
-This tutorial shows how to load a Quake 3 map into the
+This Tutorial shows how to load a Quake 3 map into the
 engine, create a SceneNode for optimizing the speed of
 rendering and how to create a user controlled camera.
 
@@ -10,7 +10,6 @@ to ask the user for a driver type using the console.
 */
 #include <irrlicht.h>
 #include "driverChoice.h"
-#include "exampleHelper.h"
 
 /*
 	define which Quake3 Level should be loaded
@@ -33,7 +32,7 @@ to ask the user for a driver type using the console.
 
 #ifdef IRRLICHT_QUAKE3_ARENA
 	#define QUAKE3_STORAGE_FORMAT	addFileArchive
-	#define QUAKE3_STORAGE_1	getExampleMediaPath() + "map-20kdm2.pk3"
+	#define QUAKE3_STORAGE_1	"../../media/map-20kdm2.pk3"
 	#define QUAKE3_MAP_NAME			"maps/20kdm2.bsp"
 #endif
 
@@ -76,7 +75,7 @@ public:
 				if (image)
 				{
 					c8 buf[256];
-					snprintf_irr(buf, 256, "%s_shot%04d.jpg",
+					snprintf(buf, 256, "%s_shot%04d.jpg",
 							FilenameTemplate.c_str(),
 							++Number);
 					Device->getVideoDriver()->writeImageToFile(image, buf, 85 );
@@ -145,10 +144,8 @@ int IRRCALLCONV main(int argc, char* argv[])
 	scene::ISceneManager* smgr = device->getSceneManager();
 	gui::IGUIEnvironment* gui = device->getGUIEnvironment();
 
-	const io::path mediaPath = getExampleMediaPath();
-
 	//! add our private media directory to the file system
-	device->getFileSystem()->addFileArchive(mediaPath);
+	device->getFileSystem()->addFileArchive("../../media/");
 
 	/*
 	To display the Quake 3 map, we first need to load it. Quake 3 maps
@@ -214,7 +211,7 @@ int IRRCALLCONV main(int argc, char* argv[])
 		const scene::IMesh * const additional_mesh = mesh->getMesh(quake3::E_Q3_MESH_ITEMS);
 
 #ifdef SHOW_SHADER_NAME
-		gui::IGUIFont *font = device->getGUIEnvironment()->getFont(mediaPath + "fontlucida.png");
+		gui::IGUIFont *font = device->getGUIEnvironment()->getFont("../../media/fontlucida.png");
 		u32 count = 0;
 #endif
 
@@ -332,6 +329,7 @@ int IRRCALLCONV main(int argc, char* argv[])
 		case video::EDT_OPENGL:
 			gui->addImage(driver->getTexture("opengllogo.png"), pos);
 			break;
+		case video::EDT_DIRECT3D8:
 		case video::EDT_DIRECT3D9:
 			gui->addImage(driver->getTexture("directxlogo.png"), pos);
 			break;
@@ -349,7 +347,7 @@ int IRRCALLCONV main(int argc, char* argv[])
 	while(device->run())
 	if (device->isWindowActive())
 	{
-		driver->beginScene(video::ECBF_COLOR | video::ECBF_DEPTH, video::SColor(255,20,20,40));
+		driver->beginScene(true, true, video::SColor(255,20,20,40));
 		smgr->drawAll();
 		gui->drawAll();
 		driver->endScene();

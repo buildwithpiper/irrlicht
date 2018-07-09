@@ -38,10 +38,10 @@ public:
 
 	//! returns true if the file maybe is able to be loaded by this class
 	//! based on the file extension (e.g. ".ply")
-	virtual bool isALoadableFileExtension(const io::path& filename) const _IRR_OVERRIDE_;
+	virtual bool isALoadableFileExtension(const io::path& filename) const;
 
 	//! creates/loads an animated mesh from the file.
-	virtual IAnimatedMesh* createMesh(io::IReadFile* file) _IRR_OVERRIDE_;
+	virtual IAnimatedMesh* createMesh(io::IReadFile* file);
 
 private:
 
@@ -137,7 +137,7 @@ private:
 	io::IReadFile *File;
 	c8 *Buffer;
 	bool IsBinaryFile, IsWrongEndian, EndOfFile;
-	s32 WordLength;
+	s32 LineLength, WordLength;
 	c8 *StartPointer, *EndPointer, *LineEndPointer;
 };
 

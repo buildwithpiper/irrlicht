@@ -1,20 +1,20 @@
 /** Example 008 SpecialFX
 
-This tutorial describes how to do special effects. It shows how to use stencil
+This tutorials describes how to do special effects. It shows how to use stencil
 buffer shadows, the particle system, billboards, dynamic light, and the water
 surface scene node.
 
 We start like in some tutorials before. Please note that this time, the
 'shadows' flag in createDevice() is set to true, for we want to have a dynamic
-shadow cast from an animated character. If this example runs too slow,
-set it to false. The Irrlicht Engine also checks if your hardware doesn't 
-support the stencil buffer, and then disables shadows by itself.
+shadow casted from an animated character. If this example runs too slow,
+set it to false. The Irrlicht Engine checks if your hardware doesn't support
+the stencil buffer, and disables shadows by itself, but just in case the demo
+runs slow on your hardware.
 */
 
 #include <irrlicht.h>
 #include <iostream>
 #include "driverChoice.h"
-#include "exampleHelper.h"
 
 using namespace irr;
 
@@ -25,7 +25,7 @@ using namespace irr;
 int main()
 {
 	// ask if user would like shadows
-	char i = 'y';
+	char i;
 	printf("Please press 'y' if you want to use realtime shadows.\n");
 
 	std::cin >> i;
@@ -53,10 +53,8 @@ int main()
 	video::IVideoDriver* driver = device->getVideoDriver();
 	scene::ISceneManager* smgr = device->getSceneManager();
 
-	const io::path mediaPath = getExampleMediaPath();
-
 	/*
-	For our environment, we load a .3ds file. It is a small room I modeled
+	For our environment, we load a .3ds file. It is a small room I modelled
 	with Anim8or and exported into the 3ds format because the Irrlicht
 	Engine does not support the .an8 format. I am a very bad 3d graphic
 	artist, and so the texture mapping is not very nice in this model.
@@ -69,14 +67,14 @@ int main()
 	off too with this code.
 	*/
 
-	scene::IAnimatedMesh* mesh = smgr->getMesh(mediaPath + "room.3ds");
+	scene::IAnimatedMesh* mesh = smgr->getMesh("../../media/room.3ds");
 
 	smgr->getMeshManipulator()->makePlanarTextureMapping(mesh->getMesh(0), 0.004f);
 
 	scene::ISceneNode* node = 0;
 
 	node = smgr->addAnimatedMeshSceneNode(mesh);
-	node->setMaterialTexture(0, driver->getTexture(mediaPath + "wall.jpg"));
+	node->setMaterialTexture(0, driver->getTexture("../../media/wall.jpg"));
 	node->getMaterial(0).SpecularColor.set(0,0,0,0);
 
 	/*
@@ -99,8 +97,8 @@ int main()
 	node = smgr->addWaterSurfaceSceneNode(mesh->getMesh(0), 3.0f, 300.0f, 30.0f);
 	node->setPosition(core::vector3df(0,7,0));
 
-	node->setMaterialTexture(0, driver->getTexture(mediaPath + "stones.jpg"));
-	node->setMaterialTexture(1, driver->getTexture(mediaPath + "water.jpg"));
+	node->setMaterialTexture(0, driver->getTexture("../../media/stones.jpg"));
+	node->setMaterialTexture(1, driver->getTexture("../../media/water.jpg"));
 
 	node->setMaterialType(video::EMT_REFLECTION_2_LAYER);
 
@@ -125,7 +123,7 @@ int main()
 	node = smgr->addBillboardSceneNode(node, core::dimension2d<f32>(50, 50));
 	node->setMaterialFlag(video::EMF_LIGHTING, false);
 	node->setMaterialType(video::EMT_TRANSPARENT_ADD_COLOR);
-	node->setMaterialTexture(0, driver->getTexture(mediaPath + "particlewhite.bmp"));
+	node->setMaterialTexture(0, driver->getTexture("../../media/particlewhite.bmp"));
 
 	/*
 	The next special effect is a lot more interesting: A particle system.
@@ -167,33 +165,30 @@ int main()
 	scene::IParticleSystemSceneNode* ps =
 		smgr->addParticleSystemSceneNode(false);
 
-	if (ps)
-	{
-		scene::IParticleEmitter* em = ps->createBoxEmitter(
-			core::aabbox3d<f32>(-7,0,-7,7,1,7), // emitter size
-			core::vector3df(0.0f,0.06f,0.0f),   // initial direction
-			80,100,                             // emit rate
-			video::SColor(0,255,255,255),       // darkest color
-			video::SColor(0,255,255,255),       // brightest color
-			800,2000,0,                         // min and max age, angle
-			core::dimension2df(10.f,10.f),         // min size
-			core::dimension2df(20.f,20.f));        // max size
+	scene::IParticleEmitter* em = ps->createBoxEmitter(
+		core::aabbox3d<f32>(-7,0,-7,7,1,7), // emitter size
+		core::vector3df(0.0f,0.06f,0.0f),   // initial direction
+		80,100,                             // emit rate
+		video::SColor(0,255,255,255),       // darkest color
+		video::SColor(0,255,255,255),       // brightest color
+		800,2000,0,                         // min and max age, angle
+		core::dimension2df(10.f,10.f),         // min size
+		core::dimension2df(20.f,20.f));        // max size
 
-		ps->setEmitter(em); // this grabs the emitter
-		em->drop(); // so we can drop it here without deleting it
+	ps->setEmitter(em); // this grabs the emitter
+	em->drop(); // so we can drop it here without deleting it
 
-		scene::IParticleAffector* paf = ps->createFadeOutParticleAffector();
+	scene::IParticleAffector* paf = ps->createFadeOutParticleAffector();
 
-		ps->addAffector(paf); // same goes for the affector
-		paf->drop();
+	ps->addAffector(paf); // same goes for the affector
+	paf->drop();
 
-		ps->setPosition(core::vector3df(-70,60,40));
-		ps->setScale(core::vector3df(2,2,2));
-		ps->setMaterialFlag(video::EMF_LIGHTING, false);
-		ps->setMaterialFlag(video::EMF_ZWRITE_ENABLE, false);
-		ps->setMaterialTexture(0, driver->getTexture(mediaPath + "fire.bmp"));
-		ps->setMaterialType(video::EMT_TRANSPARENT_ADD_COLOR);
-	}
+	ps->setPosition(core::vector3df(-70,60,40));
+	ps->setScale(core::vector3df(2,2,2));
+	ps->setMaterialFlag(video::EMF_LIGHTING, false);
+	ps->setMaterialFlag(video::EMF_ZWRITE_ENABLE, false);
+	ps->setMaterialTexture(0, driver->getTexture("../../media/fire.bmp"));
+	ps->setMaterialType(video::EMT_TRANSPARENT_ADD_COLOR);
 
 	/*
 	Next we add a volumetric light node, which adds a glowing fake area light to
@@ -216,8 +211,8 @@ int main()
 		core::array<video::ITexture*> textures;
 		for (s32 g=7; g > 0; --g)
 		{
-			core::stringc tmp(mediaPath);
-			tmp += "portal";
+			core::stringc tmp;
+			tmp = "../../media/portal";
 			tmp += g;
 			tmp += ".bmp";
 			video::ITexture* t = driver->getTexture( tmp.c_str() );
@@ -235,7 +230,7 @@ int main()
 	}
 
 	/*
-	As our last special effect, we want a dynamic shadow be cast from an
+	As our last special effect, we want a dynamic shadow be casted from an
 	animated character. For this we load a DirectX .x model and place it
 	into our world. For creating the shadow, we simply need to call
 	addShadowVolumeSceneNode(). The color of shadows is only adjustable
@@ -252,7 +247,7 @@ int main()
 
 	// add animated character
 
-	mesh = smgr->getMesh(mediaPath + "dwarf.x");
+	mesh = smgr->getMesh("../../media/dwarf.x");
 	scene::IAnimatedMeshSceneNode* anode = 0;
 
 	anode = smgr->addAnimatedMeshSceneNode(mesh);
@@ -284,7 +279,7 @@ int main()
 	while(device->run())
 	if (device->isWindowActive())
 	{
-		driver->beginScene(video::ECBF_COLOR | video::ECBF_DEPTH, video::SColor(0));
+		driver->beginScene(true, true, 0);
 
 		smgr->drawAll();
 

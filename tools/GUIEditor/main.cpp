@@ -14,7 +14,7 @@ using namespace gui;
 int main()
 {
 	// ask user for driver
-	video::E_DRIVER_TYPE driverType=driverChoiceConsole(false);
+	video::E_DRIVER_TYPE driverType=driverChoiceConsole();
 	if (driverType==video::EDT_COUNT)
 		return 1;
 
@@ -56,29 +56,21 @@ int main()
 	*/
 
 	env->addGUIElement("GUIEditor");
-
-	while(device->run())
+	
+	while(device->run()) 
 	{
-		if (!device->isWindowMinimized())
+		device->sleep(10);
+
+		if (device->isWindowActive())
 		{
-			const core::dimension2d<u32>& screenSize = driver->getScreenSize();
-			wchar_t caption[512];
-			swprintf_irr(caption, 512, L"screen (%4u/%4u)", screenSize.Width, screenSize.Height);
-			device->setWindowCaption(caption);
-			driver->beginScene(video::ECBF_COLOR | video::ECBF_DEPTH, video::SColor(0,200,200,200));
+			driver->beginScene(true, true, video::SColor(0,200,200,200));
 			smgr->drawAll();
 			env->drawAll();
 			driver->endScene();
 		}
-
-		// be nice to CPU
-		device->sleep(10);
-		if (!device->isWindowActive())
-			device->sleep(90);
 	}
 
-	device->closeDevice();
 	device->drop();
-
+	
 	return 0;
 }

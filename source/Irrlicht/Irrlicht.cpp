@@ -18,12 +18,16 @@ static const char* const copyright = "Irrlicht Engine (c) 2002-2012 Nikolaus Geb
 #include "CIrrDeviceWin32.h"
 #endif
 
-#ifdef _IRR_COMPILE_WITH_X11_DEVICE_
-#include "CIrrDeviceLinux.h"
+#ifdef _IRR_COMPILE_WITH_OSX_DEVICE_
+#include "MacOSX/CIrrDeviceMacOSX.h"
 #endif
 
-#ifdef _IRR_COMPILE_WITH_OSX_DEVICE_
-#include "CIrrDeviceOSX.h"
+#ifdef _IRR_COMPILE_WITH_WINDOWS_CE_DEVICE_
+#include "CIrrDeviceWinCE.h"
+#endif
+
+#ifdef _IRR_COMPILE_WITH_X11_DEVICE_
+#include "CIrrDeviceLinux.h"
 #endif
 
 #ifdef _IRR_COMPILE_WITH_SDL_DEVICE_
@@ -73,6 +77,11 @@ namespace irr
 			dev = new CIrrDeviceMacOSX(params);
 #endif
 
+#ifdef _IRR_COMPILE_WITH_WINDOWS_CE_DEVICE_
+		if (params.DeviceType == EIDT_WINCE || (!dev && params.DeviceType == EIDT_BEST))
+			dev = new CIrrDeviceWinCE(params);
+#endif
+
 #ifdef _IRR_COMPILE_WITH_X11_DEVICE_
 		if (params.DeviceType == EIDT_X11 || (!dev && params.DeviceType == EIDT_BEST))
 			dev = new CIrrDeviceLinux(params);
@@ -118,7 +127,7 @@ namespace video
 } // end namespace irr
 
 
-#if defined(_IRR_WINDOWS_API_) && !defined(_IRR_STATIC_LIB_)
+#if defined(_IRR_WINDOWS_API_)
 
 BOOL APIENTRY DllMain( HANDLE hModule,
                        DWORD  ul_reason_for_call,

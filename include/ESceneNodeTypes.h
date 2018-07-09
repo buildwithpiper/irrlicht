@@ -19,7 +19,7 @@ namespace scene
 	enum ESCENE_NODE_TYPE
 	{
 		//! of type CSceneManager (note that ISceneManager is not(!) an ISceneNode)
-		ESNT_SCENE_MANAGER  = MAKE_IRR_ID('s','m','n','g'),
+		ESNT_SCENE_MANAGER	= MAKE_IRR_ID('s','m','n','g'),
 
 		//! simple cube scene node
 		ESNT_CUBE           = MAKE_IRR_ID('c','u','b','e'),
@@ -29,9 +29,6 @@ namespace scene
 
 		//! Text Scene Node
 		ESNT_TEXT           = MAKE_IRR_ID('t','e','x','t'),
-
-		//! Billboard text scene node
-		ESNT_BILLBOARD_TEXT = MAKE_IRR_ID('b','t','x','t'),
 
 		//! Water Surface Scene Node
 		ESNT_WATER_SURFACE  = MAKE_IRR_ID('w','a','t','r'),

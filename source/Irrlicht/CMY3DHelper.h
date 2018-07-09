@@ -18,7 +18,7 @@
 #ifndef __C_MY3D_HELPER_H_INCLUDED__
 #define __C_MY3D_HELPER_H_INCLUDED__
 
-#include "irrTypes.h"
+#include <irrTypes.h>
 
 namespace irr
 {
@@ -269,7 +269,7 @@ unsigned long process_comp(
     unsigned char *out_buf, int out_buf_size)
 {
      // we start out with 3 repeating bytes
-     int len = 3;
+     register int len = 3;
 
      unsigned char ch;
 
@@ -328,13 +328,15 @@ void process_uncomp(
 //-----------------------------------------------------------
 void flush_outbuf(unsigned char *out_buf, int out_buf_size)
 {
-    if (!outbuf_cnt)
+    register int pos=0;
+
+    if(!outbuf_cnt)
        return;        // nothing to do */
 
     // send no. of unencoded bytes to be sent
     put_byte((unsigned char)(outbuf_cnt - 1), out_buf, out_buf_size);
 
-    for (int pos=0; outbuf_cnt; outbuf_cnt--)
+    for ( ; outbuf_cnt; outbuf_cnt--)
        put_byte((unsigned char)outbuf[pos++], out_buf, out_buf_size);
 }
 //---------------------------------------------------
@@ -407,7 +409,7 @@ int rle_decode (
             nReadedBytes++;
 
             // uncompress a chunk
-            for (; i; --i)
+            for ( ; i ; i--)
             {
                 if (nDecodedBytes<out_buf_size)
                     out_buf[nDecodedBytes] = ch;
@@ -417,8 +419,9 @@ int rle_decode (
         else
         {
             // copy out some uncompressed bytes
-	    // i is the no. of bytes
-            for (i = ch + 1; i; --i)
+            i = ch + 1;     // i is the no. of bytes
+            // uncompress a chunk
+            for ( ; i ; i--)
             {
                 if (nReadedBytes>=in_buf_size)
                     break;

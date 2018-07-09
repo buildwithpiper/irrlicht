@@ -6,7 +6,6 @@
 #ifdef _IRR_COMPILE_WITH_COLLADA_LOADER_
 
 #include "CColladaFileLoader.h"
-#include "CMeshTextureLoader.h"
 #include "os.h"
 #include "IXMLReader.h"
 #include "IDummyTransformationSceneNode.h"
@@ -93,7 +92,6 @@ namespace
 	const core::stringc instanceMaterialName = "instance_material";
 	const core::stringc instanceLightName =    "instance_light";
 	const core::stringc instanceNodeName =     "instance_node";
-	const core::stringc instanceCameraName =   "instance_camera";
 	const core::stringc bindMaterialName =     "bind_material";
 	const core::stringc extraNodeName =        "extra";
 	const core::stringc techniqueNodeName =    "technique";
@@ -108,8 +106,6 @@ namespace
 	const core::stringc dataName =             "data";
 	const core::stringc wrapsName =            "wrap_s";
 	const core::stringc wraptName =            "wrap_t";
-	const core::stringc wraprName =            "wrap_r";	// for downward compatibility to bug in old Irrlicht collada writer. Not standard but we wrote that accidentally up to Irrlicht 1.8, so we should still be able to load those files
-	const core::stringc wrappName =            "wrap_p";
 	const core::stringc minfilterName =        "minfilter";
 	const core::stringc magfilterName =        "magfilter";
 	const core::stringc mipfilterName =        "mipfilter";
@@ -126,7 +122,7 @@ namespace
 	const core::stringc profileCOMMONAttributeName = "COMMON";
 
 	const char* const inputSemanticNames[] = {"POSITION", "VERTEX", "NORMAL", "TEXCOORD",
-		"UV", "TANGENT", "IMAGE", "TEXTURE", "COLOR", 0};
+		"UV", "TANGENT", "IMAGE", "TEXTURE", 0};
 
 	// We have to read ambient lights like other light types here, so we need a type for it
 	const video::E_LIGHT_TYPE ELT_AMBIENT = video::E_LIGHT_TYPE(video::ELT_COUNT+1);
@@ -258,7 +254,7 @@ namespace
 			os::Printer::log("COLLADA: Constructing camera instance", Id.c_str(), ELL_DEBUG);
 			#endif
 
-			scene::ICameraSceneNode* c = mgr->addCameraSceneNode(parent, core::vector3df(0,0,0), core::vector3df(0,0,100), -1, false);
+			scene::ICameraSceneNode* c = mgr->addCameraSceneNode(parent);
 			if (c)
 			{
 				c->setFOV(YFov);
@@ -332,8 +328,6 @@ CColladaFileLoader::CColladaFileLoader(scene::ISceneManager* smgr,
 	#ifdef _DEBUG
 	setDebugName("CColladaFileLoader");
 	#endif
-
-	TextureLoader = new CMeshTextureLoader( FileSystem, SceneManager->getVideoDriver() );
 }
 
 
@@ -365,9 +359,6 @@ IAnimatedMesh* CColladaFileLoader::createMesh(io::IReadFile* file)
 	io::IXMLReaderUTF8* reader = FileSystem->createXMLReaderUTF8(file);
 	if (!reader)
 		return 0;
-
-	if ( getMeshTextureLoader() )
-		getMeshTextureLoader()->setMeshFile(file);
 
 	CurrentlyLoadingMesh = file->getFileName();
 	CreateInstances = SceneManager->getParameters()->getAttributeAsBool(
@@ -798,9 +789,7 @@ void CColladaFileLoader::readNodeSection(io::IXMLReaderUTF8* reader, scene::ISce
 			if ((instanceName == reader->getNodeName()) ||
 				(instanceNodeName == reader->getNodeName()) ||
 				(instanceGeometryName == reader->getNodeName()) ||
-				(instanceLightName == reader->getNodeName()) ||
-				(instanceCameraName == reader->getNodeName())
-				)
+				(instanceLightName == reader->getNodeName()))
 			{
 				scene::ISceneNode* newnode = 0;
 				readInstanceNode(reader, parent, &newnode, nodeprefab, reader->getNodeName());
@@ -1571,23 +1560,11 @@ void CColladaFileLoader::readEffect(io::IXMLReaderUTF8* reader, SColladaEffect *
 	idx = effect->Parameters->findAttribute(wraptName.c_str());
 	if ( idx >= 0 )
 		twv = (video::E_TEXTURE_CLAMP)(effect->Parameters->getAttributeAsInt(idx));
-	video::E_TEXTURE_CLAMP twr = video::ETC_REPEAT;
-	idx = effect->Parameters->findAttribute(wrappName.c_str());
-	if ( idx >= 0 )
-		twr = (video::E_TEXTURE_CLAMP)(effect->Parameters->getAttributeAsInt(idx));
-	else
-	{
-		// for downward compatibility with older Irrlicht collada writer
-		idx = effect->Parameters->findAttribute(wraprName.c_str());
-		if ( idx >= 0 )
-			twr = (video::E_TEXTURE_CLAMP)(effect->Parameters->getAttributeAsInt(idx));
-	}
-
+	
 	for (u32 i=0; i<video::MATERIAL_MAX_TEXTURES; ++i)
 	{
 		effect->Mat.TextureLayer[i].TextureWrapU = twu;
 		effect->Mat.TextureLayer[i].TextureWrapV = twv;
-		effect->Mat.TextureLayer[i].TextureWrapW = twr;
 	}
 
 	effect->Mat.setFlag(video::EMF_BILINEAR_FILTER, effect->Parameters->getAttributeAsBool("bilinear"));
@@ -1940,6 +1917,7 @@ void CColladaFileLoader::readPolygonSection(io::IXMLReaderUTF8* reader,
 	bool parsePolygonOK = false;
 	bool parseVcountOK = false;
 	u32 inputSemanticCount = 0;
+	bool unresolvedInput=false;
 	u32 maxOffset = 0;
 	core::array<SColladaInput> localInputs;
 
@@ -2094,6 +2072,7 @@ void CColladaFileLoader::readPolygonSection(io::IXMLReaderUTF8* reader,
 			os::Printer::log("COLLADA Warning, polygon input source not found",
 				inp.Source.c_str(), ELL_DEBUG);
 			inp.Semantic=ECIS_COUNT; // for unknown
+			unresolvedInput=true;
 		}
 		else
 		{
@@ -2204,15 +2183,6 @@ void CColladaFileLoader::readPolygonSection(io::IXMLReaderUTF8* reader,
 						break;
 					case ECIS_TANGENT:
 						break;
-					case ECIS_COLOR:
-					{
-						video::SColorf col;
-						col.r = localInputs[k].Data[idx+0];
-						col.g = localInputs[k].Data[idx+1];
-						col.b = localInputs[k].Data[idx+2];
-						vtx.Color = col.toSColor();
-						break;
-					}
 					default:
 						break;
 					}
@@ -2347,15 +2317,6 @@ void CColladaFileLoader::readPolygonSection(io::IXMLReaderUTF8* reader,
 						break;
 					case ECIS_TANGENT:
 						break;
-					case ECIS_COLOR:
-					{
-						video::SColorf col;
-						col.r = localInputs[k].Data[idx+0];
-						col.g = localInputs[k].Data[idx+1];
-						col.b = localInputs[k].Data[idx+2];
-						vtx.Color = col.toSColor();
-						break;
-					}
 					default:
 						break;
 					}
@@ -2835,7 +2796,9 @@ video::ITexture* CColladaFileLoader::getTextureFromImage(core::stringc uri, SCol
 			{
 				if (Images[i].Source.size() && Images[i].SourceIsFilename)
 				{
-					return getMeshTextureLoader() ? getMeshTextureLoader()->getTexture( Images[i].Source ) : NULL;
+					if (FileSystem->existFile(Images[i].Source))
+						return driver->getTexture(Images[i].Source);
+					return driver->getTexture((FileSystem->getFileDir(CurrentlyLoadingMesh)+"/"+Images[i].Source));
 				}
 				else
 				if (Images[i].Source.size())

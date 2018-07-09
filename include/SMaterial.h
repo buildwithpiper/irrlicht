@@ -22,28 +22,28 @@ namespace video
 	//! Flag for EMT_ONETEXTURE_BLEND, ( BlendFactor ) BlendFunc = source * sourceFactor + dest * destFactor
 	enum E_BLEND_FACTOR
 	{
-		EBF_ZERO	= 0,		//!< src & dest	(0, 0, 0, 0)
-		EBF_ONE,			//!< src & dest	(1, 1, 1, 1)
-		EBF_DST_COLOR,			//!< src	(destR, destG, destB, destA)
+		EBF_ZERO	= 0,			//!< src & dest	(0, 0, 0, 0)
+		EBF_ONE,					//!< src & dest	(1, 1, 1, 1)
+		EBF_DST_COLOR, 				//!< src	(destR, destG, destB, destA)
 		EBF_ONE_MINUS_DST_COLOR,	//!< src	(1-destR, 1-destG, 1-destB, 1-destA)
-		EBF_SRC_COLOR,			//!< dest	(srcR, srcG, srcB, srcA)
-		EBF_ONE_MINUS_SRC_COLOR,	//!< dest	(1-srcR, 1-srcG, 1-srcB, 1-srcA)
-		EBF_SRC_ALPHA,			//!< src & dest	(srcA, srcA, srcA, srcA)
+		EBF_SRC_COLOR,				//!< dest	(srcR, srcG, srcB, srcA)
+		EBF_ONE_MINUS_SRC_COLOR, 	//!< dest	(1-srcR, 1-srcG, 1-srcB, 1-srcA)
+		EBF_SRC_ALPHA,				//!< src & dest	(srcA, srcA, srcA, srcA)
 		EBF_ONE_MINUS_SRC_ALPHA,	//!< src & dest	(1-srcA, 1-srcA, 1-srcA, 1-srcA)
-		EBF_DST_ALPHA,			//!< src & dest	(destA, destA, destA, destA)
+		EBF_DST_ALPHA,				//!< src & dest	(destA, destA, destA, destA)
 		EBF_ONE_MINUS_DST_ALPHA,	//!< src & dest	(1-destA, 1-destA, 1-destA, 1-destA)
 		EBF_SRC_ALPHA_SATURATE		//!< src	(min(srcA, 1-destA), idem, ...)
 	};
 
-	//! Values defining the blend operation
+	//! Values defining the blend operation used when blend is enabled
 	enum E_BLEND_OPERATION
 	{
 		EBO_NONE = 0,	//!< No blending happens
-		EBO_ADD,	//!< Default blending adds the color values
+		EBO_ADD,		//!< Default blending adds the color values
 		EBO_SUBTRACT,	//!< This mode subtracts the color values
 		EBO_REVSUBTRACT,//!< This modes subtracts destination from source
-		EBO_MIN,	//!< Choose minimum value of each color channel
-		EBO_MAX,	//!< Choose maximum value of each color channel
+		EBO_MIN,		//!< Choose minimum value of each color channel
+		EBO_MAX,		//!< Choose maximum value of each color channel
 		EBO_MIN_FACTOR,	//!< Choose minimum value of each color channel after applying blend factors, not widely supported
 		EBO_MAX_FACTOR,	//!< Choose maximum value of each color channel after applying blend factors, not widely supported
 		EBO_MIN_ALPHA,	//!< Choose minimum value of each color channel based on alpha value, not widely supported
@@ -61,8 +61,8 @@ namespace video
 	//! Comparison function, e.g. for depth buffer test
 	enum E_COMPARISON_FUNC
 	{
-		//! Depth test disabled (disable also write to depth buffer)
-		ECFN_DISABLED=0,
+		//! Test never succeeds, this equals disable
+		ECFN_NEVER=0,
 		//! <= test, default for e.g. depth test
 		ECFN_LESSEQUAL=1,
 		//! Exact equality
@@ -76,9 +76,7 @@ namespace video
 		//! inverse of <=
 		ECFN_GREATER,
 		//! test succeeds always
-		ECFN_ALWAYS,
-		//! Test never succeeds
-		ECFN_NEVER
+		ECFN_ALWAYS
 	};
 
 	//! Enum values for enabling/disabling color planes for rendering
@@ -102,7 +100,7 @@ namespace video
 
 	//! Source of the alpha value to take
 	/** This is currently only supported in EMT_ONETEXTURE_BLEND. You can use an
-	or'ed combination of values. Alpha values are modulated (multiplied). */
+	or'ed combination of values. Alpha values are modulated (multiplicated). */
 	enum E_ALPHA_SOURCE
 	{
 		//! Use no alpha, somewhat redundant with other settings
@@ -113,53 +111,27 @@ namespace video
 		EAS_TEXTURE
 	};
 
-	//! Pack srcFact, dstFact, Modulate and alpha source to MaterialTypeParam or BlendFactor
+	//! EMT_ONETEXTURE_BLEND: pack srcFact, dstFact, Modulate and alpha source to MaterialTypeParam
 	/** alpha source can be an OR'ed combination of E_ALPHA_SOURCE values. */
-	inline f32 pack_textureBlendFunc(const E_BLEND_FACTOR srcFact, const E_BLEND_FACTOR dstFact,
-			const E_MODULATE_FUNC modulate=EMFN_MODULATE_1X, const u32 alphaSource=EAS_TEXTURE)
+	inline f32 pack_textureBlendFunc ( const E_BLEND_FACTOR srcFact, const E_BLEND_FACTOR dstFact, const E_MODULATE_FUNC modulate=EMFN_MODULATE_1X, const u32 alphaSource=EAS_TEXTURE )
 	{
-		const u32 tmp = (alphaSource << 20) | (modulate << 16) | (srcFact << 12) | (dstFact << 8) | (srcFact << 4) | dstFact;
+		const u32 tmp = (alphaSource << 12) | (modulate << 8) | (srcFact << 4) | dstFact;
 		return FR(tmp);
 	}
 
-	//! Pack srcRGBFact, dstRGBFact, srcAlphaFact, dstAlphaFact, Modulate and alpha source to MaterialTypeParam or BlendFactor
-	/** alpha source can be an OR'ed combination of E_ALPHA_SOURCE values. */
-	inline f32 pack_textureBlendFuncSeparate(const E_BLEND_FACTOR srcRGBFact, const E_BLEND_FACTOR dstRGBFact,
-			const E_BLEND_FACTOR srcAlphaFact, const E_BLEND_FACTOR dstAlphaFact,
-			const E_MODULATE_FUNC modulate=EMFN_MODULATE_1X, const u32 alphaSource=EAS_TEXTURE)
-	{
-		const u32 tmp = (alphaSource << 20) | (modulate << 16) | (srcAlphaFact << 12) | (dstAlphaFact << 8) | (srcRGBFact << 4) | dstRGBFact;
-		return FR(tmp);
-	}
-
-	//! Unpack srcFact, dstFact, modulo and alphaSource factors
+	//! EMT_ONETEXTURE_BLEND: unpack srcFact & dstFact and Modulo to MaterialTypeParam
 	/** The fields don't use the full byte range, so we could pack even more... */
-	inline void unpack_textureBlendFunc(E_BLEND_FACTOR &srcFact, E_BLEND_FACTOR &dstFact,
-			E_MODULATE_FUNC &modulo, u32& alphaSource, const f32 param)
+	inline void unpack_textureBlendFunc ( E_BLEND_FACTOR &srcFact, E_BLEND_FACTOR &dstFact,
+			E_MODULATE_FUNC &modulo, u32& alphaSource, const f32 param )
 	{
 		const u32 state = IR(param);
-		alphaSource = (state & 0x00F00000) >> 20;
-		modulo = E_MODULATE_FUNC( ( state & 0x000F0000 ) >> 16 );
+		alphaSource = (state & 0x0000F000) >> 12;
+		modulo	= E_MODULATE_FUNC( ( state & 0x00000F00 ) >> 8 );
 		srcFact = E_BLEND_FACTOR ( ( state & 0x000000F0 ) >> 4 );
 		dstFact = E_BLEND_FACTOR ( ( state & 0x0000000F ) );
 	}
 
-	//! Unpack srcRGBFact, dstRGBFact, srcAlphaFact, dstAlphaFact, modulo and alphaSource factors
-	/** The fields don't use the full byte range, so we could pack even more... */
-	inline void unpack_textureBlendFuncSeparate(E_BLEND_FACTOR &srcRGBFact, E_BLEND_FACTOR &dstRGBFact,
-			E_BLEND_FACTOR &srcAlphaFact, E_BLEND_FACTOR &dstAlphaFact,
-			E_MODULATE_FUNC &modulo, u32& alphaSource, const f32 param)
-	{
-		const u32 state = IR(param);
-		alphaSource = (state & 0x00F00000) >> 20;
-		modulo = E_MODULATE_FUNC( ( state & 0x000F0000 ) >> 16 );
-		srcAlphaFact = E_BLEND_FACTOR ( ( state & 0x0000F000 ) >> 12 );
-		dstAlphaFact = E_BLEND_FACTOR ( ( state & 0x00000F00 ) >> 8 );
-		srcRGBFact = E_BLEND_FACTOR ( ( state & 0x000000F0 ) >> 4 );
-		dstRGBFact = E_BLEND_FACTOR ( ( state & 0x0000000F ) );
-	}
-
-	//! has blend factor alphablending
+	//! EMT_ONETEXTURE_BLEND: has BlendFactor Alphablending
 	inline bool textureBlendFunc_hasAlpha ( const E_BLEND_FACTOR factor )
 	{
 		switch ( factor )
@@ -192,7 +164,6 @@ namespace video
 		//! High-quality anti-aliasing, not always supported, automatically enables SIMPLE mode
 		EAAM_QUALITY=3,
 		//! Line smoothing
-		//! Careful, enabling this can lead to software emulation under OpenGL
 		EAAM_LINE_SMOOTH=4,
 		//! point smoothing, often in software and slow, only with OpenGL
 		EAAM_POINT_SMOOTH=8,
@@ -247,16 +218,6 @@ namespace video
 		0
 	};
 
-	//! Fine-tuning for SMaterial.ZWriteFineControl
-	enum E_ZWRITE_FINE_CONTROL
-	{
-		//! Default. Only write zbuffer when When SMaterial::ZBuffer is true and SMaterial::isTransparent() returns false.
-		EZI_ONLY_NON_TRANSPARENT,
-		//! Writing will just be based on SMaterial::ZBuffer value, transparency is ignored.
-		//! Needed mostly for certain shader materials as SMaterial::isTransparent will always return false for those.
-		EZI_ZBUFFER_FLAG
-	};
-
 
 	//! Maximum number of texture an SMaterial can have.
 	const u32 MATERIAL_MAX_TEXTURES = _IRR_MATERIAL_MAX_TEXTURES_;
@@ -271,12 +232,11 @@ namespace video
 			EmissiveColor(0,0,0,0), SpecularColor(255,255,255,255),
 			Shininess(0.0f), MaterialTypeParam(0.0f), MaterialTypeParam2(0.0f), Thickness(1.0f),
 			ZBuffer(ECFN_LESSEQUAL), AntiAliasing(EAAM_SIMPLE), ColorMask(ECP_ALL),
-			ColorMaterial(ECM_DIFFUSE), BlendOperation(EBO_NONE), BlendFactor(0.0f),
+			ColorMaterial(ECM_DIFFUSE), BlendOperation(EBO_NONE),
 			PolygonOffsetFactor(0), PolygonOffsetDirection(EPO_FRONT),
 			Wireframe(false), PointCloud(false), GouraudShading(true),
 			Lighting(true), ZWriteEnable(true), BackfaceCulling(true), FrontfaceCulling(false),
-			FogEnable(false), NormalizeNormals(false), UseMipMaps(true),
-			ZWriteFineControl(EZI_ONLY_NON_TRANSPARENT)
+			FogEnable(false), NormalizeNormals(false), UseMipMaps(true)
 		{ }
 
 		//! Copy constructor
@@ -326,11 +286,9 @@ namespace video
 			ColorMask = other.ColorMask;
 			ColorMaterial = other.ColorMaterial;
 			BlendOperation = other.BlendOperation;
-			BlendFactor = other.BlendFactor;
 			PolygonOffsetFactor = other.PolygonOffsetFactor;
 			PolygonOffsetDirection = other.PolygonOffsetDirection;
 			UseMipMaps = other.UseMipMaps;
-			ZWriteFineControl = other.ZWriteFineControl;
 
 			return *this;
 		}
@@ -404,14 +362,13 @@ namespace video
 		f32 Thickness;
 
 		//! Is the ZBuffer enabled? Default: ECFN_LESSEQUAL
-		/** If you want to disable depth test for this material
-		just set this parameter to ECFN_DISABLED.
-		Values are from E_COMPARISON_FUNC. */
+		/** Values are from E_COMPARISON_FUNC. */
 		u8 ZBuffer;
 
 		//! Sets the antialiasing mode
-		/** Values are chosen from E_ANTI_ALIASING_MODE. Default is
-		EAAM_SIMPLE, i.e. simple multi-sample anti-aliasing. */
+		/** Values are chosen from E_ANTI_ALIASING_MODE. Default is 
+		EAAM_SIMPLE|EAAM_LINE_SMOOTH, i.e. simple multi-sample
+		anti-aliasing and lime smoothing is enabled. */
 		u8 AntiAliasing;
 
 		//! Defines the enabled color planes
@@ -423,21 +380,16 @@ namespace video
 
 		//! Defines the interpretation of vertex color in the lighting equation
 		/** Values should be chosen from E_COLOR_MATERIAL.
-		When lighting is enabled, vertex color can be used instead of the
+		When lighting is enabled, vertex color can be used instead of the 
 		material values for light modulation. This allows to easily change e.g. the
 		diffuse light behavior of each face. The default, ECM_DIFFUSE, will result in
 		a very similar rendering as with lighting turned off, just with light shading. */
 		u8 ColorMaterial:3;
 
 		//! Store the blend operation of choice
-		/** Values to be chosen from E_BLEND_OPERATION. */
+		/** Values to be chosen from E_BLEND_OPERATION. The actual way to use this value
+		is not yet determined, so ignore it for now. */
 		E_BLEND_OPERATION BlendOperation:4;
-
-		//! Store the blend factors
-		/** textureBlendFunc/textureBlendFuncSeparate functions should be used to write
-		properly blending factors to this parameter. If you use EMT_ONETEXTURE_BLEND
-		type for this material, this field should be equal to MaterialTypeParam. */
-		f32 BlendFactor;
 
 		//! Factor specifying how far the polygon offset should be made
 		/** Specifying 0 disables the polygon offset. The direction is specified spearately.
@@ -445,7 +397,7 @@ namespace video
 		u8 PolygonOffsetFactor:3;
 
 		//! Flag defining the direction the polygon offset is applied to.
-		/** Can be to front or to back, specified by values from E_POLYGON_OFFSET. */
+		/** Can be to front or to back, specififed by values from E_POLYGON_OFFSET. */
 		E_POLYGON_OFFSET PolygonOffsetDirection:1;
 
 		//! Draw as wireframe or filled triangles? Default: false
@@ -466,8 +418,7 @@ namespace video
 		//! Is the zbuffer writeable or is it read-only. Default: true.
 		/** This flag is forced to false if the MaterialType is a
 		transparent type and the scene parameter
-		ALLOW_ZWRITE_ON_TRANSPARENT is not set. If you set this parameter
-		to true, make sure that ZBuffer value is other than ECFN_DISABLED */
+		ALLOW_ZWRITE_ON_TRANSPARENT is not set. */
 		bool ZWriteEnable:1;
 
 		//! Is backface culling enabled? Default: true
@@ -486,11 +437,6 @@ namespace video
 		//! Shall mipmaps be used if available
 		/** Sometimes, disabling mipmap usage can be useful. Default: true */
 		bool UseMipMaps:1;
-
-		//! Give more control how the ZWriteEnable flag is interpreted
-		/** Note that there is also the global flag AllowZWriteOnTransparent
-		which when set acts like all materials have set EZI_ALLOW_ON_TRANSPARENT. */
-		E_ZWRITE_FINE_CONTROL ZWriteFineControl;
 
 		//! Gets the texture transformation matrix for level i
 		/** \param i The desired level. Must not be larger than MATERIAL_MAX_TEXTURES.
@@ -595,7 +541,6 @@ namespace video
 					{
 						TextureLayer[i].TextureWrapU = (E_TEXTURE_CLAMP)value;
 						TextureLayer[i].TextureWrapV = (E_TEXTURE_CLAMP)value;
-						TextureLayer[i].TextureWrapW = (E_TEXTURE_CLAMP)value;
 					}
 				}
 				break;
@@ -609,8 +554,6 @@ namespace video
 					UseMipMaps = value; break;
 				case EMF_BLEND_OPERATION:
 					BlendOperation = value?EBO_ADD:EBO_NONE; break;
-				case EMF_BLEND_FACTOR:
-					break;
 				case EMF_POLYGON_OFFSET:
 					PolygonOffsetFactor = value?1:0;
 					PolygonOffsetDirection = EPO_BACK;
@@ -636,7 +579,7 @@ namespace video
 				case EMF_LIGHTING:
 					return Lighting;
 				case EMF_ZBUFFER:
-					return ZBuffer!=ECFN_DISABLED;
+					return ZBuffer!=ECFN_NEVER;
 				case EMF_ZWRITE_ENABLE:
 					return ZWriteEnable;
 				case EMF_BACK_FACE_CULLING:
@@ -656,7 +599,12 @@ namespace video
 				case EMF_TEXTURE_WRAP:
 					return !(TextureLayer[0].TextureWrapU ||
 							TextureLayer[0].TextureWrapV ||
-							TextureLayer[0].TextureWrapW);
+							TextureLayer[1].TextureWrapU ||
+							TextureLayer[1].TextureWrapV ||
+							TextureLayer[2].TextureWrapU ||
+							TextureLayer[2].TextureWrapV ||
+							TextureLayer[3].TextureWrapU ||
+							TextureLayer[3].TextureWrapV);
 				case EMF_ANTI_ALIASING:
 					return (AntiAliasing==1);
 				case EMF_COLOR_MASK:
@@ -667,8 +615,6 @@ namespace video
 					return UseMipMaps;
 				case EMF_BLEND_OPERATION:
 					return BlendOperation != EBO_NONE;
-				case EMF_BLEND_FACTOR:
-					return BlendFactor != 0.f;
 				case EMF_POLYGON_OFFSET:
 					return PolygonOffsetFactor != 0;
 			}
@@ -705,12 +651,9 @@ namespace video
 				ColorMask != b.ColorMask ||
 				ColorMaterial != b.ColorMaterial ||
 				BlendOperation != b.BlendOperation ||
-				BlendFactor != b.BlendFactor ||
 				PolygonOffsetFactor != b.PolygonOffsetFactor ||
 				PolygonOffsetDirection != b.PolygonOffsetDirection ||
-				UseMipMaps != b.UseMipMaps ||
-				ZWriteFineControl != b.ZWriteFineControl;
-				;
+				UseMipMaps != b.UseMipMaps;
 			for (u32 i=0; (i<MATERIAL_MAX_TEXTURES) && !different; ++i)
 			{
 				different |= (TextureLayer[i] != b.TextureLayer[i]);
@@ -726,33 +669,11 @@ namespace video
 
 		bool isTransparent() const
 		{
-			if ( MaterialType==EMT_TRANSPARENT_ADD_COLOR ||
+			return MaterialType==EMT_TRANSPARENT_ADD_COLOR ||
 				MaterialType==EMT_TRANSPARENT_ALPHA_CHANNEL ||
 				MaterialType==EMT_TRANSPARENT_VERTEX_ALPHA ||
-				MaterialType==EMT_TRANSPARENT_REFLECTION_2_LAYER )
-				return true;
-
-			if (BlendOperation != EBO_NONE && BlendFactor != 0.f)
-			{
-				E_BLEND_FACTOR srcRGBFact = EBF_ZERO;
-				E_BLEND_FACTOR dstRGBFact = EBF_ZERO;
-				E_BLEND_FACTOR srcAlphaFact = EBF_ZERO;
-				E_BLEND_FACTOR dstAlphaFact = EBF_ZERO;
-				E_MODULATE_FUNC modulo = EMFN_MODULATE_1X;
-				u32 alphaSource = 0;
-
-				unpack_textureBlendFuncSeparate(srcRGBFact, dstRGBFact, srcAlphaFact, dstAlphaFact, modulo, alphaSource, BlendFactor);
-
-				if (textureBlendFunc_hasAlpha(srcRGBFact) || textureBlendFunc_hasAlpha(dstRGBFact) ||
-					textureBlendFunc_hasAlpha(srcAlphaFact) || textureBlendFunc_hasAlpha(dstAlphaFact))
-				{
-					return true;
-				}
-			}
-
-			return false;
+				MaterialType==EMT_TRANSPARENT_REFLECTION_2_LAYER;
 		}
-
 	};
 
 	//! global const identity Material

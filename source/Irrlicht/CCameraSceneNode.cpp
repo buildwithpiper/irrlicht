@@ -17,7 +17,6 @@ namespace scene
 CCameraSceneNode::CCameraSceneNode(ISceneNode* parent, ISceneManager* mgr, s32 id,
 	const core::vector3df& position, const core::vector3df& lookat)
 	: ICameraSceneNode(parent, mgr, id, position),
-	BoundingBox(core::vector3df(0, 0, 0)),	// Camera has no size. Still not sure if FLT_MAX might be the better variant
 	Target(lookat), UpVector(0.0f, 1.0f, 0.0f), ZNear(1.0f), ZFar(3000.0f),
 	InputReceiverEnabled(true), TargetAndRotationAreBound(false)
 {
@@ -35,7 +34,6 @@ CCameraSceneNode::CCameraSceneNode(ISceneNode* parent, ISceneManager* mgr, s32 i
 	else
 		Aspect = 4.0f / 3.0f;	// Aspect ratio.
 
-	ViewArea.setFarNearDistance(ZFar - ZNear);
 	recalculateProjectionMatrix();
 	recalculateViewArea();
 }
@@ -51,6 +49,7 @@ void CCameraSceneNode::setInputReceiverEnabled(bool enabled)
 //! Returns if the input receiver of the camera is currently enabled.
 bool CCameraSceneNode::isInputReceiverEnabled() const
 {
+	_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 	return InputReceiverEnabled;
 }
 
@@ -202,7 +201,6 @@ void CCameraSceneNode::setNearValue(f32 f)
 {
 	ZNear = f;
 	recalculateProjectionMatrix();
-	ViewArea.setFarNearDistance(ZFar - ZNear);
 }
 
 
@@ -210,7 +208,6 @@ void CCameraSceneNode::setFarValue(f32 f)
 {
 	ZFar = f;
 	recalculateProjectionMatrix();
-	ViewArea.setFarNearDistance(ZFar - ZNear);
 }
 
 
@@ -247,19 +244,6 @@ void CCameraSceneNode::OnRegisterSceneNode()
 //! render
 void CCameraSceneNode::render()
 {
-	updateMatrices();
-
-	video::IVideoDriver* driver = SceneManager->getVideoDriver();
-	if ( driver)
-	{
-		driver->setTransform(video::ETS_PROJECTION, ViewArea.getTransform ( video::ETS_PROJECTION) );
-		driver->setTransform(video::ETS_VIEW, ViewArea.getTransform ( video::ETS_VIEW) );
-	}
-}
-
-//! update
-void CCameraSceneNode::updateMatrices()
-{
 	core::vector3df pos = getAbsolutePosition();
 	core::vector3df tgtv = Target - pos;
 	tgtv.normalize();
@@ -279,19 +263,24 @@ void CCameraSceneNode::updateMatrices()
 	ViewArea.getTransform(video::ETS_VIEW).buildCameraLookAtMatrixLH(pos, Target, up);
 	ViewArea.getTransform(video::ETS_VIEW) *= Affector;
 	recalculateViewArea();
+
+	video::IVideoDriver* driver = SceneManager->getVideoDriver();
+	if ( driver)
+	{
+		driver->setTransform(video::ETS_PROJECTION, ViewArea.getTransform ( video::ETS_PROJECTION) );
+		driver->setTransform(video::ETS_VIEW, ViewArea.getTransform ( video::ETS_VIEW) );
+	}
 }
+
 
 //! returns the axis aligned bounding box of this node
 const core::aabbox3d<f32>& CCameraSceneNode::getBoundingBox() const
 {
-	// NOTE: We deliberately don't return the boundingbox of the ViewArea. People can access that already.
-	// We want to prevent cameras from having their bounding box colliding in the SceneCollisionManager.
-	// If another boundingbox is ever necessary then please move BoundingBox to ICameraSceneNode and make it accessible (via a setter or an enum with options).
-	return BoundingBox;
+	return ViewArea.getBoundingBox();
 }
 
 
-//! returns the view frustum.
+//! returns the view frustum. needed sometimes by bsp or lod render nodes.
 const SViewFrustum* CCameraSceneNode::getViewFrustum() const
 {
 	return &ViewArea;

@@ -211,6 +211,7 @@ video::SColor CGUIStaticText::getBackgroundColor() const
 //! Checks if background drawing is enabled
 bool CGUIStaticText::isDrawBackgroundEnabled() const
 {
+	_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 	return Background;
 }
 
@@ -225,6 +226,7 @@ void CGUIStaticText::setDrawBorder(bool draw)
 //! Checks if border drawing is enabled
 bool CGUIStaticText::isDrawBorderEnabled() const
 {
+	_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 	return Border;
 }
 
@@ -254,7 +256,7 @@ video::SColor CGUIStaticText::getOverrideColor() const
 }
 
 
-//! Sets if the static text should use the override color or the
+//! Sets if the static text should use the overide color or the
 //! color in the gui skin.
 void CGUIStaticText::enableOverrideColor(bool enable)
 {
@@ -264,6 +266,7 @@ void CGUIStaticText::enableOverrideColor(bool enable)
 
 bool CGUIStaticText::isOverrideColorEnabled() const
 {
+	_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 	return OverrideColorEnabled;
 }
 
@@ -279,6 +282,7 @@ void CGUIStaticText::setWordWrap(bool enable)
 
 bool CGUIStaticText::isWordWrapEnabled() const
 {
+	_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 	return WordWrap;
 }
 

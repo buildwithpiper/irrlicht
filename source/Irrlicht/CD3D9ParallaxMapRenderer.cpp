@@ -227,16 +227,17 @@ namespace video
 		: CD3D9ShaderMaterialRenderer(d3ddev, driver, 0, baseMaterial),
 		CurrentScale(0.0f)
 	{
+	
 		#ifdef _DEBUG
 		setDebugName("CD3D9ParallaxMapRenderer");
 		#endif
-
+	
 		// set this as callback. We could have done this in
 		// the initialization list, but some compilers don't like it.
 
 		CallBack = this;
 
-		// basically, this thing simply compiles these hardcoded shaders if the
+		// basicly, this thing simply compiles these hardcoded shaders if the
 		// hardware is able to do them, otherwise it maps to the base material
 
 		if (!driver->queryFeature(video::EVDF_PIXEL_SHADER_1_4) ||

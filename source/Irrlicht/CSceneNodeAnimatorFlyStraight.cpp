@@ -15,14 +15,12 @@ CSceneNodeAnimatorFlyStraight::CSceneNodeAnimatorFlyStraight(const core::vector3
 				const core::vector3df& endPoint, u32 timeForWay,
 				bool loop, u32 now, bool pingpong)
 : ISceneNodeAnimatorFinishing(now + timeForWay),
-	Start(startPoint), End(endPoint), TimeFactor(0.0f),
+	Start(startPoint), End(endPoint), TimeFactor(0.0f), StartTime(now),
 	TimeForWay(timeForWay), Loop(loop), PingPong(pingpong)
 {
 	#ifdef _DEBUG
 	setDebugName("CSceneNodeAnimatorFlyStraight");
 	#endif
-
-	StartTime = now;
 
 	recalculateIntermediateValues();
 }
@@ -42,7 +40,7 @@ void CSceneNodeAnimatorFlyStraight::animateNode(ISceneNode* node, u32 timeMs)
 	if (!node)
 		return;
 
-	u32 t = (timeMs-(StartTime+PauseTimeSum));
+	u32 t = (timeMs-StartTime);
 
 	core::vector3df pos;
 
@@ -79,8 +77,6 @@ void CSceneNodeAnimatorFlyStraight::animateNode(ISceneNode* node, u32 timeMs)
 //! Writes attributes of the scene node animator.
 void CSceneNodeAnimatorFlyStraight::serializeAttributes(io::IAttributes* out, io::SAttributeReadWriteOptions* options) const
 {
-	ISceneNodeAnimatorFinishing::serializeAttributes(out, options);
-
 	out->addVector3d("Start", Start);
 	out->addVector3d("End", End);
 	out->addInt("TimeForWay", TimeForWay);
@@ -92,8 +88,6 @@ void CSceneNodeAnimatorFlyStraight::serializeAttributes(io::IAttributes* out, io
 //! Reads attributes of the scene node animator.
 void CSceneNodeAnimatorFlyStraight::deserializeAttributes(io::IAttributes* in, io::SAttributeReadWriteOptions* options)
 {
-	ISceneNodeAnimatorFinishing::deserializeAttributes(in, options);
-
 	Start = in->getAttributeAsVector3d("Start");
 	End = in->getAttributeAsVector3d("End");
 	TimeForWay = in->getAttributeAsInt("TimeForWay");
@@ -108,7 +102,6 @@ ISceneNodeAnimator* CSceneNodeAnimatorFlyStraight::createClone(ISceneNode* node,
 {
 	CSceneNodeAnimatorFlyStraight * newAnimator =
 		new CSceneNodeAnimatorFlyStraight(Start, End, TimeForWay, Loop, StartTime, PingPong);
-	newAnimator->cloneMembers(this);
 
 	return newAnimator;
 }

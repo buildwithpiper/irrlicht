@@ -2,15 +2,14 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
-#include "COpenGLNormalMapRenderer.h"
-
+#include "IrrCompileConfig.h"
 #ifdef _IRR_COMPILE_WITH_OPENGL_
 
+#include "COpenGLNormalMapRenderer.h"
 #include "IGPUProgrammingServices.h"
 #include "IShaderConstantSetCallBack.h"
 #include "IVideoDriver.h"
 #include "os.h"
-
 #include "COpenGLDriver.h"
 
 namespace irr
@@ -154,7 +153,7 @@ const char OPENGL_NORMAL_MAP_PSH[] =
 
 //! Constructor
 COpenGLNormalMapRenderer::COpenGLNormalMapRenderer(video::COpenGLDriver* driver,
-	s32& outMaterialTypeNr, E_MATERIAL_TYPE baseMaterial)
+	s32& outMaterialTypeNr, IMaterialRenderer* baseMaterial)
 	: COpenGLShaderMaterialRenderer(driver, 0, baseMaterial), CompiledShaders(true)
 {
 

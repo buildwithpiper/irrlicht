@@ -2,16 +2,15 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
-#include "COpenGLParallaxMapRenderer.h"
-
+#include "IrrCompileConfig.h"
 #ifdef _IRR_COMPILE_WITH_OPENGL_
 
+#include "COpenGLParallaxMapRenderer.h"
+#include "COpenGLDriver.h"
 #include "IGPUProgrammingServices.h"
 #include "IShaderConstantSetCallBack.h"
 #include "IVideoDriver.h"
 #include "os.h"
-
-#include "COpenGLDriver.h"
 
 namespace irr
 {
@@ -188,7 +187,7 @@ const char OPENGL_PARALLAX_MAP_PSH[] =
 
 //! Constructor
 COpenGLParallaxMapRenderer::COpenGLParallaxMapRenderer(video::COpenGLDriver* driver,
-	s32& outMaterialTypeNr, E_MATERIAL_TYPE baseMaterial)
+	s32& outMaterialTypeNr, IMaterialRenderer* baseMaterial)
 	: COpenGLShaderMaterialRenderer(driver, 0, baseMaterial), CompiledShaders(true)
 {
 
@@ -320,7 +319,7 @@ void COpenGLParallaxMapRenderer::OnSetConstants(IMaterialRendererServices* servi
 
 		// Transform the light by the inverse world matrix to get it into object space.
 		invWorldMat.transformVect(light.Position);
-
+		
 		services->setVertexShaderConstant(
 			reinterpret_cast<const f32*>(&light.Position), 12+(i*2), 1);
 

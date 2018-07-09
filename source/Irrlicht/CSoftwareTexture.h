@@ -6,15 +6,12 @@
 #define __C_SOFTWARE_TEXTURE_H_INCLUDED__
 
 #include "ITexture.h"
-#include "IRenderTarget.h"
 #include "CImage.h"
 
 namespace irr
 {
 namespace video
 {
-
-class CSoftwareDriver;
 
 /*!
 	interface for a Video Driver dependent Texture.
@@ -24,16 +21,23 @@ class CSoftwareTexture : public ITexture
 public:
 
 	//! constructor
-	CSoftwareTexture(IImage* surface, const io::path& name, bool renderTarget=false);
+	CSoftwareTexture(IImage* surface, const io::path& name,
+			bool renderTarget=false, void* mipmapData=0);
 
 	//! destructor
 	virtual ~CSoftwareTexture();
 
 	//! lock function
-	virtual void* lock(E_TEXTURE_LOCK_MODE mode = ETLM_READ_WRITE, u32 layer = 0) _IRR_OVERRIDE_;
+	virtual void* lock(E_TEXTURE_LOCK_MODE mode=ETLM_READ_WRITE, u32 mipmapLevel=0);
 
 	//! unlock function
-	virtual void unlock() _IRR_OVERRIDE_;
+	virtual void unlock();
+
+	//! Returns original size of the texture.
+	virtual const core::dimension2d<u32>& getOriginalSize() const;
+
+	//! Returns (=size) of the texture.
+	virtual const core::dimension2d<u32>& getSize() const;
 
 	//! returns unoptimized surface
 	virtual CImage* getImage();
@@ -41,28 +45,27 @@ public:
 	//! returns texture surface
 	virtual CImage* getTexture();
 
-	virtual void regenerateMipMapLevels(void* data = 0, u32 layer = 0) _IRR_OVERRIDE_;
+	//! returns driver type of texture (=the driver, who created the texture)
+	virtual E_DRIVER_TYPE getDriverType() const;
+
+	//! returns color format of texture
+	virtual ECOLOR_FORMAT getColorFormat() const;
+
+	//! returns pitch of texture (in bytes)
+	virtual u32 getPitch() const;
+
+	//! Regenerates the mip map levels of the texture. Useful after locking and
+	//! modifying the texture
+	virtual void regenerateMipMapLevels(void* mipmapData=0);
+
+	//! is it a render target?
+	virtual bool isRenderTarget() const;
 
 private:
 	CImage* Image;
 	CImage* Texture;
-};
-
-/*!
-	interface for a Video Driver dependent render target.
-*/
-class CSoftwareRenderTarget : public IRenderTarget
-{
-public:
-	CSoftwareRenderTarget(CSoftwareDriver* driver);
-	virtual ~CSoftwareRenderTarget();
-
-	virtual void setTexture(const core::array<ITexture*>& texture, ITexture* depthStencil) _IRR_OVERRIDE_;
-
-	ITexture* getTexture() const;
-
-protected:
-	CSoftwareDriver* Driver;
+	core::dimension2d<u32> OrigSize;
+	bool IsRenderTarget;
 };
 
 

@@ -14,7 +14,7 @@
 #include "irrString.h"
 
 // enable this to keep track of changes to the matrix
-// and make simpler identity check for seldom changing matrices
+// and make simpler identity check for seldomly changing matrices
 // otherwise identity check will always compare the elements
 //#define USE_MATRIX_TEST
 
@@ -60,19 +60,6 @@ namespace core
 			//! Default constructor
 			/** \param constructor Choose the initialization style */
 			CMatrix4( eConstructor constructor = EM4CONST_IDENTITY );
-
-			//! Constructor with value initialization
-			CMatrix4(const T& r0c0, const T& r0c1, const T& r0c2, const T& r0c3,
-			         const T& r1c0, const T& r1c1, const T& r1c2, const T& r1c3,
-			         const T& r2c0, const T& r2c1, const T& r2c2, const T& r2c3,
-			         const T& r3c0, const T& r3c1, const T& r3c2, const T& r3c3)
-			{
-				M[0]  = r0c0; M[1]  = r0c1; M[2]  = r0c2; M[3]  = r0c3;
-				M[4]  = r1c0; M[5]  = r1c1; M[6]  = r1c2; M[7]  = r1c3;
-				M[8]  = r2c0; M[9]  = r2c1; M[10] = r2c2; M[11] = r2c3;
-				M[12] = r3c0; M[13] = r3c1; M[14] = r3c2; M[15] = r3c3;
-			}
-
 			//! Copy constructor
 			/** \param other Other matrix to copy from
 			\param constructor Choose the initialization style */
@@ -186,15 +173,8 @@ namespace core
 			//! Make a rotation matrix from Euler angles. The 4th row and column are unmodified.
 			CMatrix4<T>& setRotationDegrees( const vector3d<T>& rotation );
 
-			//! Get the rotation, as set by setRotation() when you already know the scale.
-			/** If you already know the scale then this function is faster than the other getRotationDegrees overload.
-			NOTE: You will have the same end-rotation as used in setRotation, but it might not use the same axis values.
-			*/
-			core::vector3d<T> getRotationDegrees(const vector3d<T>& scale) const;
-
 			//! Returns the rotation, as set by setRotation().
-			/** NOTE: You will have the same end-rotation as used in setRotation, but it might not use the same axis values.
-			*/
+			/** This code was orginally written by by Chev. */
 			core::vector3d<T> getRotationDegrees() const;
 
 			//! Make an inverted rotation matrix from Euler angles.
@@ -234,25 +214,18 @@ namespace core
 			void rotateVect(T *out,const core::vector3df &in) const;
 
 			//! Transforms the vector by this matrix
-			/** This operation is performed as if the vector was 4d with the 4th component =1 */
 			void transformVect( vector3df& vect) const;
 
 			//! Transforms input vector by this matrix and stores result in output vector
-			/** This operation is performed as if the vector was 4d with the 4th component =1 */
 			void transformVect( vector3df& out, const vector3df& in ) const;
 
 			//! An alternate transform vector method, writing into an array of 4 floats
-			/** This operation is performed as if the vector was 4d with the 4th component =1.
-				NOTE: out[3] will be written to (4th vector component)*/
 			void transformVect(T *out,const core::vector3df &in) const;
 
 			//! An alternate transform vector method, reading from and writing to an array of 3 floats
-			/** This operation is performed as if the vector was 4d with the 4th component =1
-				NOTE: out[3] will be written to (4th vector component)*/
 			void transformVec3(T *out, const T * in) const;
 
 			//! Translate a vector by the translation part of this matrix.
-			/** This operation is performed as if the vector was 4d with the 4th component =1 */
 			void translateVect( vector3df& vect ) const;
 
 			//! Transforms a plane by this matrix
@@ -267,7 +240,7 @@ namespace core
 			void transformBox(core::aabbox3d<f32>& box) const;
 
 			//! Transforms a axis aligned bounding box
-			/** The result box of this operation should be accurate, but this operation
+			/** The result box of this operation should by accurate, but this operation
 			is slower than transformBox(). */
 			void transformBoxEx(core::aabbox3d<f32>& box) const;
 
@@ -283,7 +256,7 @@ namespace core
 			/** \param out: where result matrix is written to. */
 			bool getInversePrimitive ( CMatrix4<T>& out ) const;
 
-			//! Gets the inverse matrix of this one
+			//! Gets the inversed matrix of this one
 			/** \param out: where result matrix is written to.
 			\return Returns false if there is no inverse matrix. */
 			bool getInverse(CMatrix4<T>& out) const;
@@ -392,11 +365,6 @@ namespace core
 			\return Altered matrix */
 			CMatrix4<T>& setTextureTranslate( f32 x, f32 y );
 
-			//! Get texture transformation translation
-			/** \param x returns offset on x axis
-			\param y returns offset on y axis */
-			void getTextureTranslate( f32& x, f32& y ) const;
-
 			//! Set texture transformation translation, using a transposed representation
 			/** Doesn't clear other elements than those affected.
 			\param x Offset on x axis
@@ -410,11 +378,6 @@ namespace core
 			\param sy Scale factor on y axis
 			\return Altered matrix. */
 			CMatrix4<T>& setTextureScale( f32 sx, f32 sy );
-
-			//! Get texture transformation scale
-			/** \param sx Returns x axis scale factor
-			\param sy Returns y axis scale factor */
-			void getTextureScale( f32& sx, f32& sy ) const;
 
 			//! Set texture transformation scale, and recenter at (0.5,0.5)
 			/** Doesn't clear other elements than those affected.
@@ -892,14 +855,12 @@ namespace core
 	//! Returns a rotation that is equivalent to that set by setRotationDegrees().
 	/** This code was sent in by Chev.  Note that it does not necessarily return
 	the *same* Euler angles as those set by setRotationDegrees(), but the rotation will
-	be equivalent, i.e. will have the same result when used to rotate a vector or node.
-	This code was originally written by by Chev.
-	*/
+	be equivalent, i.e. will have the same result when used to rotate a vector or node. */
 	template <class T>
-	inline core::vector3d<T> CMatrix4<T>::getRotationDegrees(const vector3d<T>& scale_) const
+	inline core::vector3d<T> CMatrix4<T>::getRotationDegrees() const
 	{
 		const CMatrix4<T> &mat = *this;
-		core::vector3d<T> scale(scale_);
+		core::vector3d<T> scale = getScale();
 		// we need to check for negative scale on to axes, which would bring up wrong results
 		if (scale.Y<0 && scale.Z<0)
 		{
@@ -950,17 +911,6 @@ namespace core
 		return vector3d<T>((T)X,(T)Y,(T)Z);
 	}
 
-	//! Returns a rotation that is equivalent to that set by setRotationDegrees().
-	/** This code was sent in by Chev.  Note that it does not necessarily return
-	the *same* Euler angles as those set by setRotationDegrees(), but the rotation will
-	be equivalent, i.e. will have the same result when used to rotate a vector or node.
-	This code was originally written by by Chev. */
-	template <class T>
-	inline core::vector3d<T> CMatrix4<T>::getRotationDegrees() const
-	{
-		return getRotationDegrees(getScale());
-	}
-
 
 	//! Sets matrix to rotation matrix of inverse angles given as parameters
 	template <class T>
@@ -997,18 +947,18 @@ namespace core
 	template <class T>
 	inline CMatrix4<T>& CMatrix4<T>::setRotationAxisRadians( const T& angle, const vector3d<T>& axis )
 	{
-		const f64 c = cos(angle);
+ 		const f64 c = cos(angle);
 		const f64 s = sin(angle);
 		const f64 t = 1.0 - c;
 
 		const f64 tx  = t * axis.X;
-		const f64 ty  = t * axis.Y;
+		const f64 ty  = t * axis.Y;		
 		const f64 tz  = t * axis.Z;
 
 		const f64 sx  = s * axis.X;
 		const f64 sy  = s * axis.Y;
 		const f64 sz  = s * axis.Z;
-
+		
 		M[0] = (T)(tx * axis.X + c);
 		M[1] = (T)(tx * axis.Y + sz);
 		M[2] = (T)(tx * axis.Z - sy);
@@ -1371,66 +1321,66 @@ namespace core
 #endif
 		const CMatrix4<T> &m = *this;
 
-		f32 d = (m[0] * m[5] - m[1] * m[4]) * (m[10] * m[15] - m[11] * m[14]) -
-			(m[0] * m[6] - m[2] * m[4]) * (m[9] * m[15] - m[11] * m[13]) +
-			(m[0] * m[7] - m[3] * m[4]) * (m[9] * m[14] - m[10] * m[13]) +
-			(m[1] * m[6] - m[2] * m[5]) * (m[8] * m[15] - m[11] * m[12]) -
-			(m[1] * m[7] - m[3] * m[5]) * (m[8] * m[14] - m[10] * m[12]) +
-			(m[2] * m[7] - m[3] * m[6]) * (m[8] * m[13] - m[9] * m[12]);
+		f32 d = (m(0, 0) * m(1, 1) - m(0, 1) * m(1, 0)) * (m(2, 2) * m(3, 3) - m(2, 3) * m(3, 2)) -
+			(m(0, 0) * m(1, 2) - m(0, 2) * m(1, 0)) * (m(2, 1) * m(3, 3) - m(2, 3) * m(3, 1)) +
+			(m(0, 0) * m(1, 3) - m(0, 3) * m(1, 0)) * (m(2, 1) * m(3, 2) - m(2, 2) * m(3, 1)) +
+			(m(0, 1) * m(1, 2) - m(0, 2) * m(1, 1)) * (m(2, 0) * m(3, 3) - m(2, 3) * m(3, 0)) -
+			(m(0, 1) * m(1, 3) - m(0, 3) * m(1, 1)) * (m(2, 0) * m(3, 2) - m(2, 2) * m(3, 0)) +
+			(m(0, 2) * m(1, 3) - m(0, 3) * m(1, 2)) * (m(2, 0) * m(3, 1) - m(2, 1) * m(3, 0));
 
 		if( core::iszero ( d, FLT_MIN ) )
 			return false;
 
 		d = core::reciprocal ( d );
 
-		out[0] = d * (m[5] * (m[10] * m[15] - m[11] * m[14]) +
-				m[6] * (m[11] * m[13] - m[9] * m[15]) +
-				m[7] * (m[9] * m[14] - m[10] * m[13]));
-		out[1] = d * (m[9] * (m[2] * m[15] - m[3] * m[14]) +
-				m[10] * (m[3] * m[13] - m[1] * m[15]) +
-				m[11] * (m[1] * m[14] - m[2] * m[13]));
-		out[2] = d * (m[13] * (m[2] * m[7] - m[3] * m[6]) +
-				m[14] * (m[3] * m[5] - m[1] * m[7]) +
-				m[15] * (m[1] * m[6] - m[2] * m[5]));
-		out[3] = d * (m[1] * (m[7] * m[10] - m[6] * m[11]) +
-				m[2] * (m[5] * m[11] - m[7] * m[9]) +
-				m[3] * (m[6] * m[9] - m[5] * m[10]));
-		out[4] = d * (m[6] * (m[8] * m[15] - m[11] * m[12]) +
-				m[7] * (m[10] * m[12] - m[8] * m[14]) +
-				m[4] * (m[11] * m[14] - m[10] * m[15]));
-		out[5] = d * (m[10] * (m[0] * m[15] - m[3] * m[12]) +
-				m[11] * (m[2] * m[12] - m[0] * m[14]) +
-				m[8] * (m[3] * m[14] - m[2] * m[15]));
-		out[6] = d * (m[14] * (m[0] * m[7] - m[3] * m[4]) +
-				m[15] * (m[2] * m[4] - m[0] * m[6]) +
-				m[12] * (m[3] * m[6] - m[2] * m[7]));
-		out[7] = d * (m[2] * (m[7] * m[8] - m[4] * m[11]) +
-				m[3] * (m[4] * m[10] - m[6] * m[8]) +
-				m[0] * (m[6] * m[11] - m[7] * m[10]));
-		out[8] = d * (m[7] * (m[8] * m[13] - m[9] * m[12]) +
-				m[4] * (m[9] * m[15] - m[11] * m[13]) +
-				m[5] * (m[11] * m[12] - m[8] * m[15]));
-		out[9] = d * (m[11] * (m[0] * m[13] - m[1] * m[12]) +
-				m[8] * (m[1] * m[15] - m[3] * m[13]) +
-				m[9] * (m[3] * m[12] - m[0] * m[15]));
-		out[10] = d * (m[15] * (m[0] * m[5] - m[1] * m[4]) +
-				m[12] * (m[1] * m[7] - m[3] * m[5]) +
-				m[13] * (m[3] * m[4] - m[0] * m[7]));
-		out[11] = d * (m[3] * (m[5] * m[8] - m[4] * m[9]) +
-				m[0] * (m[7] * m[9] - m[5] * m[11]) +
-				m[1] * (m[4] * m[11] - m[7] * m[8]));
-		out[12] = d * (m[4] * (m[10] * m[13] - m[9] * m[14]) +
-				m[5] * (m[8] * m[14] - m[10] * m[12]) +
-				m[6] * (m[9] * m[12] - m[8] * m[13]));
-		out[13] = d * (m[8] * (m[2] * m[13] - m[1] * m[14]) +
-				m[9] * (m[0] * m[14] - m[2] * m[12]) +
-				m[10] * (m[1] * m[12] - m[0] * m[13]));
-		out[14] = d * (m[12] * (m[2] * m[5] - m[1] * m[6]) +
-				m[13] * (m[0] * m[6] - m[2] * m[4]) +
-				m[14] * (m[1] * m[4] - m[0] * m[5]));
-		out[15] = d * (m[0] * (m[5] * m[10] - m[6] * m[9]) +
-				m[1] * (m[6] * m[8] - m[4] * m[10]) +
-				m[2] * (m[4] * m[9] - m[5] * m[8]));
+		out(0, 0) = d * (m(1, 1) * (m(2, 2) * m(3, 3) - m(2, 3) * m(3, 2)) +
+				m(1, 2) * (m(2, 3) * m(3, 1) - m(2, 1) * m(3, 3)) +
+				m(1, 3) * (m(2, 1) * m(3, 2) - m(2, 2) * m(3, 1)));
+		out(0, 1) = d * (m(2, 1) * (m(0, 2) * m(3, 3) - m(0, 3) * m(3, 2)) +
+				m(2, 2) * (m(0, 3) * m(3, 1) - m(0, 1) * m(3, 3)) +
+				m(2, 3) * (m(0, 1) * m(3, 2) - m(0, 2) * m(3, 1)));
+		out(0, 2) = d * (m(3, 1) * (m(0, 2) * m(1, 3) - m(0, 3) * m(1, 2)) +
+				m(3, 2) * (m(0, 3) * m(1, 1) - m(0, 1) * m(1, 3)) +
+				m(3, 3) * (m(0, 1) * m(1, 2) - m(0, 2) * m(1, 1)));
+		out(0, 3) = d * (m(0, 1) * (m(1, 3) * m(2, 2) - m(1, 2) * m(2, 3)) +
+				m(0, 2) * (m(1, 1) * m(2, 3) - m(1, 3) * m(2, 1)) +
+				m(0, 3) * (m(1, 2) * m(2, 1) - m(1, 1) * m(2, 2)));
+		out(1, 0) = d * (m(1, 2) * (m(2, 0) * m(3, 3) - m(2, 3) * m(3, 0)) +
+				m(1, 3) * (m(2, 2) * m(3, 0) - m(2, 0) * m(3, 2)) +
+				m(1, 0) * (m(2, 3) * m(3, 2) - m(2, 2) * m(3, 3)));
+		out(1, 1) = d * (m(2, 2) * (m(0, 0) * m(3, 3) - m(0, 3) * m(3, 0)) +
+				m(2, 3) * (m(0, 2) * m(3, 0) - m(0, 0) * m(3, 2)) +
+				m(2, 0) * (m(0, 3) * m(3, 2) - m(0, 2) * m(3, 3)));
+		out(1, 2) = d * (m(3, 2) * (m(0, 0) * m(1, 3) - m(0, 3) * m(1, 0)) +
+				m(3, 3) * (m(0, 2) * m(1, 0) - m(0, 0) * m(1, 2)) +
+				m(3, 0) * (m(0, 3) * m(1, 2) - m(0, 2) * m(1, 3)));
+		out(1, 3) = d * (m(0, 2) * (m(1, 3) * m(2, 0) - m(1, 0) * m(2, 3)) +
+				m(0, 3) * (m(1, 0) * m(2, 2) - m(1, 2) * m(2, 0)) +
+				m(0, 0) * (m(1, 2) * m(2, 3) - m(1, 3) * m(2, 2)));
+		out(2, 0) = d * (m(1, 3) * (m(2, 0) * m(3, 1) - m(2, 1) * m(3, 0)) +
+				m(1, 0) * (m(2, 1) * m(3, 3) - m(2, 3) * m(3, 1)) +
+				m(1, 1) * (m(2, 3) * m(3, 0) - m(2, 0) * m(3, 3)));
+		out(2, 1) = d * (m(2, 3) * (m(0, 0) * m(3, 1) - m(0, 1) * m(3, 0)) +
+				m(2, 0) * (m(0, 1) * m(3, 3) - m(0, 3) * m(3, 1)) +
+				m(2, 1) * (m(0, 3) * m(3, 0) - m(0, 0) * m(3, 3)));
+		out(2, 2) = d * (m(3, 3) * (m(0, 0) * m(1, 1) - m(0, 1) * m(1, 0)) +
+				m(3, 0) * (m(0, 1) * m(1, 3) - m(0, 3) * m(1, 1)) +
+				m(3, 1) * (m(0, 3) * m(1, 0) - m(0, 0) * m(1, 3)));
+		out(2, 3) = d * (m(0, 3) * (m(1, 1) * m(2, 0) - m(1, 0) * m(2, 1)) +
+				m(0, 0) * (m(1, 3) * m(2, 1) - m(1, 1) * m(2, 3)) +
+				m(0, 1) * (m(1, 0) * m(2, 3) - m(1, 3) * m(2, 0)));
+		out(3, 0) = d * (m(1, 0) * (m(2, 2) * m(3, 1) - m(2, 1) * m(3, 2)) +
+				m(1, 1) * (m(2, 0) * m(3, 2) - m(2, 2) * m(3, 0)) +
+				m(1, 2) * (m(2, 1) * m(3, 0) - m(2, 0) * m(3, 1)));
+		out(3, 1) = d * (m(2, 0) * (m(0, 2) * m(3, 1) - m(0, 1) * m(3, 2)) +
+				m(2, 1) * (m(0, 0) * m(3, 2) - m(0, 2) * m(3, 0)) +
+				m(2, 2) * (m(0, 1) * m(3, 0) - m(0, 0) * m(3, 1)));
+		out(3, 2) = d * (m(3, 0) * (m(0, 2) * m(1, 1) - m(0, 1) * m(1, 2)) +
+				m(3, 1) * (m(0, 0) * m(1, 2) - m(0, 2) * m(1, 0)) +
+				m(3, 2) * (m(0, 1) * m(1, 0) - m(0, 0) * m(1, 1)));
+		out(3, 3) = d * (m(0, 0) * (m(1, 1) * m(2, 2) - m(1, 2) * m(2, 1)) +
+				m(0, 1) * (m(1, 2) * m(2, 0) - m(1, 0) * m(2, 2)) +
+				m(0, 2) * (m(1, 0) * m(2, 1) - m(1, 1) * m(2, 0)));
 
 #if defined ( USE_MATRIX_TEST )
 		out.definitelyIdentityMatrix = definitelyIdentityMatrix;
@@ -2088,7 +2038,7 @@ namespace core
 	}
 
 
-	//! Builds a combined matrix which translate to a center before rotation and translate afterward
+	//! Builds a combined matrix which translate to a center before rotation and translate afterwards
 	template <class T>
 	inline void CMatrix4<T>::setRotationCenter(const core::vector3df& center, const core::vector3df& translation)
 	{
@@ -2182,12 +2132,6 @@ namespace core
 		return *this;
 	}
 
-	template <class T>
-	inline void CMatrix4<T>::getTextureTranslate(f32& x, f32& y) const
-	{
-		x = (f32)M[8];
-		y = (f32)M[9];
-	}
 
 	template <class T>
 	inline CMatrix4<T>& CMatrix4<T>::setTextureTranslateTransposed ( f32 x, f32 y )
@@ -2196,7 +2140,7 @@ namespace core
 		M[6] = (T)y;
 
 #if defined ( USE_MATRIX_TEST )
-		definitelyIdentityMatrix = definitelyIdentityMatrix && (x==0.0f) && (y==0.0f);
+		definitelyIdentityMatrix = definitelyIdentityMatrix && (x==0.0f) && (y==0.0f) ;
 #endif
 		return *this;
 	}
@@ -2212,12 +2156,6 @@ namespace core
 		return *this;
 	}
 
-	template <class T>
-	inline void CMatrix4<T>::getTextureScale ( f32& sx, f32& sy ) const
-	{
-		sx = (f32)M[0];
-		sy = (f32)M[5];
-	}
 
 	template <class T>
 	inline CMatrix4<T>& CMatrix4<T>::setTextureScaleCenter( f32 sx, f32 sy )
@@ -2253,8 +2191,6 @@ namespace core
 	{
 #if defined ( USE_MATRIX_TEST )
 		definitelyIdentityMatrix = isDefinitelyIdentityMatrix;
-#else
-		(void)isDefinitelyIdentityMatrix; // prevent compiler warning
 #endif
 	}
 

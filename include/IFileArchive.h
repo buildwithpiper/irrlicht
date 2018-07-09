@@ -14,7 +14,7 @@ namespace irr
 namespace io
 {
 
-//! FileSystemType: which filesystem should be used for e.g. browsing
+//! FileSystemType: which Filesystem should be used for e.g. browsing
 enum EFileSystemType
 {
 	FILESYSTEM_NATIVE = 0,	// Native OS FileSystem
@@ -75,9 +75,6 @@ public:
 	//! get the archive type
 	virtual E_FILE_ARCHIVE_TYPE getType() const { return EFAT_UNKNOWN; }
 
-	//! return the name (id) of the file Archive
-	virtual const io::path& getArchiveName() const =0;
-
 	//! An optionally used password string
 	/** This variable is publicly accessible from the interface in order to
 	avoid single access patterns to this place, and hence allow some more
@@ -109,7 +106,7 @@ public:
 	//! Check to see if the loader can create archives of this type.
 	/** Check based on the archive type.
 	\param fileType The archive type to check.
-	\return True if the archive loader supports this type, false if not */
+	\return True if the archile loader supports this type, false if not */
 	virtual bool isALoadableFileFormat(E_FILE_ARCHIVE_TYPE fileType) const =0;
 
 	//! Creates an archive from the filename

@@ -3,10 +3,6 @@
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
 #include "CParticleCylinderEmitter.h"
-
-#include "IrrCompileConfig.h"
-#ifdef _IRR_COMPILE_WITH_PARTICLES_
-
 #include "os.h"
 #include "IAttributes.h"
 
@@ -31,7 +27,7 @@ CParticleCylinderEmitter::CParticleCylinderEmitter(
 	MaxParticlesPerSecond(maxParticlesPerSecond),
 	MinStartColor(minStartColor), MaxStartColor(maxStartColor),
 	MinLifeTime(lifeTimeMin), MaxLifeTime(lifeTimeMax),
-	Radius(radius), Length(length), Time(0),
+	Radius(radius), Length(length), Time(0), Emitted(0),
 	MaxAngleDegrees(maxAngleDegrees), OutlineOnly(outlineOnly)
 {
 	#ifdef _DEBUG
@@ -125,15 +121,15 @@ void CParticleCylinderEmitter::serializeAttributes(io::IAttributes* out, io::SAt
 	out->addFloat("MinStartSizeWidth", MinStartSize.Width);
 	out->addFloat("MinStartSizeHeight", MinStartSize.Height);
 	out->addFloat("MaxStartSizeWidth", MaxStartSize.Width);
-	out->addFloat("MaxStartSizeHeight", MaxStartSize.Height);
+	out->addFloat("MaxStartSizeHeight", MaxStartSize.Height); 
 	out->addInt("MinParticlesPerSecond", MinParticlesPerSecond);
 	out->addInt("MaxParticlesPerSecond", MaxParticlesPerSecond);
 	out->addColor("MinStartColor", MinStartColor);
 	out->addColor("MaxStartColor", MaxStartColor);
 	out->addInt("MinLifeTime", MinLifeTime);
 	out->addInt("MaxLifeTime", MaxLifeTime);
-	out->addFloat("Radius", Radius);
-	out->addFloat("Length", Length);
+	out->addFloat("Radius", Radius); 
+	out->addFloat("Length", Length); 
 	out->addInt("MaxAngleDegrees", MaxAngleDegrees);
 	out->addBool("OutlineOnly", OutlineOnly);
 }
@@ -161,7 +157,7 @@ void CParticleCylinderEmitter::deserializeAttributes(io::IAttributes* in, io::SA
 		MaxStartSize.Width = in->getAttributeAsFloat(idx);
 	idx = in->findAttribute("MaxStartSizeHeight");
 	if ( idx >= 0 )
-		MaxStartSize.Height = in->getAttributeAsFloat(idx);
+		MaxStartSize.Height = in->getAttributeAsFloat(idx); 
 
 	MinParticlesPerSecond = in->getAttributeAsInt("MinParticlesPerSecond");
 	MaxParticlesPerSecond = in->getAttributeAsInt("MaxParticlesPerSecond");
@@ -179,8 +175,8 @@ void CParticleCylinderEmitter::deserializeAttributes(io::IAttributes* in, io::SA
 	MaxLifeTime = core::max_(MaxLifeTime, MinLifeTime);
 	MinLifeTime = core::min_(MinLifeTime, MaxLifeTime);
 
-	Radius = in->getAttributeAsFloat("Radius");
-	Length = in->getAttributeAsFloat("Length");
+	Radius = in->getAttributeAsFloat("Radius"); 
+	Length = in->getAttributeAsFloat("Length"); 
 	MaxAngleDegrees = in->getAttributeAsInt("MaxAngleDegrees");
 	OutlineOnly = in->getAttributeAsBool("OutlineOnly");
 }
@@ -188,6 +184,4 @@ void CParticleCylinderEmitter::deserializeAttributes(io::IAttributes* in, io::SA
 
 } // end namespace scene
 } // end namespace irr
-
-#endif // _IRR_COMPILE_WITH_PARTICLES_
 

@@ -30,69 +30,57 @@ namespace scene
 		CSceneNodeAnimatorCameraFPS(gui::ICursorControl* cursorControl,
 			f32 rotateSpeed = 100.0f, f32 moveSpeed = .5f, f32 jumpSpeed=0.f,
 			SKeyMap* keyMapArray=0, u32 keyMapSize=0, bool noVerticalMovement=false,
-			bool invertY=false, float rotateSpeedKeyboard = 0.3f);
+			bool invertY=false);
 
 		//! Destructor
 		virtual ~CSceneNodeAnimatorCameraFPS();
 
 		//! Animates the scene node, currently only works on cameras
-		virtual void animateNode(ISceneNode* node, u32 timeMs) _IRR_OVERRIDE_;
+		virtual void animateNode(ISceneNode* node, u32 timeMs);
 
 		//! Event receiver
-		virtual bool OnEvent(const SEvent& event) _IRR_OVERRIDE_;
+		virtual bool OnEvent(const SEvent& event);
 
 		//! Returns the speed of movement in units per second
-		virtual f32 getMoveSpeed() const _IRR_OVERRIDE_;
+		virtual f32 getMoveSpeed() const;
 
 		//! Sets the speed of movement in units per second
-		virtual void setMoveSpeed(f32 moveSpeed) _IRR_OVERRIDE_;
+		virtual void setMoveSpeed(f32 moveSpeed);
 
-		//! Returns the rotation speed when moving mouse
-		virtual f32 getRotateSpeed() const _IRR_OVERRIDE_;
+		//! Returns the rotation speed
+		virtual f32 getRotateSpeed() const;
 
-		//! Set the rotation speed when moving mouse
-		virtual void setRotateSpeed(f32 rotateSpeed) _IRR_OVERRIDE_;
-
-		//! Returns the rotation speed when using keyboard
-		virtual f32 getRotateSpeedKeyboard() const _IRR_OVERRIDE_
-		{
-			return RotateSpeedKeyboard;
-		}
-
-		//! Set the rotation speed when using keyboard
-		virtual void setRotateSpeedKeyboard(f32 rotateSpeed) _IRR_OVERRIDE_
-		{
-			RotateSpeedKeyboard = rotateSpeed;
-		}
+		//! Set the rotation speed
+		virtual void setRotateSpeed(f32 rotateSpeed);
 
 		//! Sets the keyboard mapping for this animator (old style)
 		//! \param keymap: an array of keyboard mappings, see SKeyMap
 		//! \param count: the size of the keyboard map array
-		virtual void setKeyMap(SKeyMap *map, u32 count) _IRR_OVERRIDE_;
+		virtual void setKeyMap(SKeyMap *map, u32 count);
 
 		//! Sets the keyboard mapping for this animator
-		//!	\param keymap The new keymap array
-		virtual void setKeyMap(const core::array<SKeyMap>& keymap) _IRR_OVERRIDE_;
+		//!	\param keymap The new keymap array 
+		virtual void setKeyMap(const core::array<SKeyMap>& keymap);
 
 		//! Gets the keyboard mapping for this animator
-		virtual const core::array<SKeyMap>& getKeyMap() const _IRR_OVERRIDE_;
+		virtual const core::array<SKeyMap>& getKeyMap() const;
 
 		//! Sets whether vertical movement should be allowed.
-		virtual void setVerticalMovement(bool allow) _IRR_OVERRIDE_;
+		virtual void setVerticalMovement(bool allow);
 
 		//! Sets whether the Y axis of the mouse should be inverted.
 		/** If enabled then moving the mouse down will cause
 		the camera to look up. It is disabled by default. */
-		virtual void setInvertMouse(bool invert) _IRR_OVERRIDE_;
+		virtual void setInvertMouse(bool invert);
 
 		//! This animator will receive events when attached to the active camera
-		virtual bool isEventReceiverEnabled() const _IRR_OVERRIDE_
+		virtual bool isEventReceiverEnabled() const
 		{
 			return true;
 		}
 
 		//! Returns the type of this animator
-		virtual ESCENE_NODE_ANIMATOR_TYPE getType() const _IRR_OVERRIDE_
+		virtual ESCENE_NODE_ANIMATOR_TYPE getType() const
 		{
 			return ESNAT_CAMERA_FPS;
 		}
@@ -101,14 +89,7 @@ namespace scene
 		/** Please note that you will have to drop
 		(IReferenceCounted::drop()) the returned pointer once you're
 		done with it. */
-		virtual ISceneNodeAnimator* createClone(ISceneNode* node, ISceneManager* newManager=0) _IRR_OVERRIDE_;
-
-		//! Writes attributes of the scene node animator.
-		virtual void serializeAttributes(io::IAttributes* out, io::SAttributeReadWriteOptions* options=0) const _IRR_OVERRIDE_;
-
-		//! Reads attributes of the scene node animator.
-		virtual void deserializeAttributes(io::IAttributes* in, io::SAttributeReadWriteOptions* options=0) _IRR_OVERRIDE_;
-
+		virtual ISceneNodeAnimator* createClone(ISceneNode* node, ISceneManager* newManager=0);
 
 	private:
 		void allKeysUp();
@@ -116,10 +97,8 @@ namespace scene
 		gui::ICursorControl *CursorControl;
 
 		f32 MaxVerticalAngle;
-		bool NoVerticalMovement;
 
 		f32 MoveSpeed;
-		f32 RotateSpeedKeyboard;
 		f32 RotateSpeed;
 		f32 JumpSpeed;
 		// -1.0f for inverted mouse, defaults to 1.0f
@@ -134,6 +113,7 @@ namespace scene
 
 		bool firstUpdate;
 		bool firstInput;
+		bool NoVerticalMovement;
 	};
 
 } // end namespace scene

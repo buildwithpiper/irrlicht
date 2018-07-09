@@ -6,7 +6,6 @@
 #ifdef _IRR_COMPILE_WITH_GUI_
 
 #include "os.h"
-#include "coreutil.h"
 #include "IGUIEnvironment.h"
 #include "IXMLReader.h"
 #include "IReadFile.h"
@@ -64,7 +63,7 @@ CGUIFont::~CGUIFont()
 
 
 //! loads a font file from xml
-bool CGUIFont::load(io::IXMLReader* xml, const io::path& directory)
+bool CGUIFont::load(io::IXMLReader* xml)
 {
 	if (!SpriteBank)
 		return false;
@@ -85,19 +84,21 @@ bool CGUIFont::load(io::IXMLReader* xml, const io::path& directory)
 				while (i+1 > SpriteBank->getTextureCount())
 					SpriteBank->addTexture(0);
 
-				bool flags[3];
-				pushTextureCreationFlags(flags);
+				// disable mipmaps+filtering
+				bool mipmap = Driver->getTextureCreationFlag(video::ETCF_CREATE_MIP_MAPS);
+				Driver->setTextureCreationFlag(video::ETCF_CREATE_MIP_MAPS, false);
 
 				// load texture
-				io::path textureFullName = core::mergeFilename(directory, fn);
-				SpriteBank->setTexture(i, Driver->getTexture(textureFullName));
+				SpriteBank->setTexture(i, Driver->getTexture(fn));
 
-				popTextureCreationFlags(flags);
+				// set previous mip-map+filter state
+				Driver->setTextureCreationFlag(video::ETCF_CREATE_MIP_MAPS, mipmap);
 
 				// couldn't load texture, abort.
 				if (!SpriteBank->getTexture(i))
 				{
 					os::Printer::log("Unable to load all textures in the font, aborting", ELL_ERROR);
+					_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 					return false;
 				}
 				else
@@ -216,23 +217,6 @@ void CGUIFont::setMaxHeight()
 
 }
 
-void CGUIFont::pushTextureCreationFlags(bool(&flags)[3])
-{
-	flags[0] = Driver->getTextureCreationFlag(video::ETCF_ALLOW_NON_POWER_2);
-	flags[1] = Driver->getTextureCreationFlag(video::ETCF_CREATE_MIP_MAPS);
-	flags[2] = Driver->getTextureCreationFlag(video::ETCF_ALLOW_MEMORY_COPY);
-
-	Driver->setTextureCreationFlag(video::ETCF_ALLOW_NON_POWER_2, true);
-	Driver->setTextureCreationFlag(video::ETCF_CREATE_MIP_MAPS, false);
-	Driver->setTextureCreationFlag(video::ETCF_ALLOW_MEMORY_COPY, true);
-}
-
-void CGUIFont::popTextureCreationFlags(bool(&flags)[3])
-{
-	Driver->setTextureCreationFlag(video::ETCF_ALLOW_NON_POWER_2, flags[0]);
-	Driver->setTextureCreationFlag(video::ETCF_CREATE_MIP_MAPS, flags[1]);
-	Driver->setTextureCreationFlag(video::ETCF_ALLOW_MEMORY_COPY, flags[2]);
-}
 
 //! loads a font file, native file needed, for texture parsing
 bool CGUIFont::load(io::IReadFile* file)
@@ -300,12 +284,17 @@ bool CGUIFont::loadTexture(video::IImage* image, const io::path& name)
 
 	if ( ret )
 	{
-		bool flags[3];
-		pushTextureCreationFlags(flags);
+		bool flag[2];
+		flag[0] = Driver->getTextureCreationFlag ( video::ETCF_ALLOW_NON_POWER_2 );
+		flag[1] = Driver->getTextureCreationFlag ( video::ETCF_CREATE_MIP_MAPS );
+
+		Driver->setTextureCreationFlag(video::ETCF_ALLOW_NON_POWER_2, true);
+		Driver->setTextureCreationFlag(video::ETCF_CREATE_MIP_MAPS, false );
 
 		SpriteBank->addTexture(Driver->addTexture(name, tmpImage));
 
-		popTextureCreationFlags(flags);
+		Driver->setTextureCreationFlag(video::ETCF_ALLOW_NON_POWER_2, flag[0] );
+		Driver->setTextureCreationFlag(video::ETCF_CREATE_MIP_MAPS, flag[1] );
 	}
 	if (deleteTmpImage)
 		tmpImage->drop();

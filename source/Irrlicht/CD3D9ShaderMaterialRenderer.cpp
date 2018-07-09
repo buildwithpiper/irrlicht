@@ -130,15 +130,16 @@ void CD3D9ShaderMaterialRenderer::OnSetMaterial(const video::SMaterial& material
 			if (FAILED(pID3DDevice->SetPixelShader(PixelShader)))
 				os::Printer::log("Could not set pixel shader.", ELL_WARNING);
 		}
+
+		if (BaseMaterial)
+			BaseMaterial->OnSetMaterial(material, material, true, services);
 	}
 
-	services->setBasicRenderStates(material, lastMaterial, resetAllRenderstates);
-
-	if (BaseMaterial)
-        BaseMaterial->OnSetMaterial(material, lastMaterial, resetAllRenderstates, services);
-
+	//let callback know used material
 	if (CallBack)
 		CallBack->OnSetMaterial(material);
+
+	services->setBasicRenderStates(material, lastMaterial, resetAllRenderstates);
 }
 
 
@@ -155,7 +156,7 @@ void CD3D9ShaderMaterialRenderer::OnUnsetMaterial()
 }
 
 
-//! Returns if the material is transparent. The scene management needs to know this
+//! Returns if the material is transparent. The scene managment needs to know this
 //! for being able to sort the materials by opaque and transparent.
 bool CD3D9ShaderMaterialRenderer::isTransparent() const
 {
@@ -179,7 +180,7 @@ bool CD3D9ShaderMaterialRenderer::createPixelShader(const c8* pxsh)
 		stubD3DXAssembleShader(pxsh, (UINT)strlen(pxsh), 0, 0, 0, &code, &errors);
 	#else
 
-		// compile shader and emit some debug information to
+		// compile shader and emitt some debug informations to
 		// make it possible to debug the shader in visual studio
 
 		static int irr_dbg_file_nr = 0;
@@ -239,7 +240,7 @@ bool CD3D9ShaderMaterialRenderer::createVertexShader(const char* vtxsh)
 
 	#else
 
-		// compile shader and emit some debug information to
+		// compile shader and emitt some debug informations to
 		// make it possible to debug the shader in visual studio
 
 		static int irr_dbg_file_nr = 0;

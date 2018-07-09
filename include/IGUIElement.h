@@ -13,12 +13,14 @@
 #include "EGUIElementTypes.h"
 #include "EGUIAlignment.h"
 #include "IAttributes.h"
-#include "IGUIEnvironment.h"
 
 namespace irr
 {
 namespace gui
 {
+
+class IGUIEnvironment;
+
 //! Base class of all GUI elements.
 class IGUIElement : public virtual io::IAttributeExchangingObject, public IEventReceiver
 {
@@ -54,7 +56,6 @@ public:
 		core::list<IGUIElement*>::Iterator it = Children.begin();
 		for (; it != Children.end(); ++it)
 		{
-			(*it)->sendRemoveEvent();
 			(*it)->Parent = 0;
 			(*it)->drop();
 		}
@@ -66,6 +67,7 @@ public:
 	{
 		return Parent;
 	}
+
 
 	//! Returns the relative rectangle of this element.
 	core::rect<s32> getRelativePosition() const
@@ -237,14 +239,14 @@ public:
 	\return The topmost GUI element at that point, or 0 if there are
 	no candidate elements at this point.
 	*/
-	virtual IGUIElement* getElementFromPoint(const core::position2d<s32>& point)
+	IGUIElement* getElementFromPoint(const core::position2d<s32>& point)
 	{
 		IGUIElement* target = 0;
 
 		// we have to search from back to front, because later children
 		// might be drawn over the top of earlier ones.
 
-		core::list<IGUIElement*>::ConstIterator it = Children.getLast();
+		core::list<IGUIElement*>::Iterator it = Children.getLast();
 
 		if (isVisible())
 		{
@@ -276,9 +278,9 @@ public:
 	//! Adds a GUI element as new child of this element.
 	virtual void addChild(IGUIElement* child)
 	{
-		if ( child && child != this )
+		addChildToEnd(child);
+		if (child)
 		{
-			addChildToEnd(child);
 			child->updateAbsolutePosition();
 		}
 	}
@@ -290,7 +292,6 @@ public:
 		for (; it != Children.end(); ++it)
 			if ((*it) == child)
 			{
-				(*it)->sendRemoveEvent();
 				(*it)->Parent = 0;
 				(*it)->drop();
 				Children.erase(it);
@@ -341,22 +342,10 @@ public:
 	//! Returns true if element is visible.
 	virtual bool isVisible() const
 	{
+		_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 		return IsVisible;
 	}
 
-	//! Check whether the element is truly visible, taking into accounts its parents' visibility
-	/** \return true if the element and all its parents are visible,
-	false if this or any parent element is invisible. */
-	virtual bool isTrulyVisible() const
-	{
-		if(!IsVisible)
-			return false;
-
-		if(!Parent)
-			return true;
-
-		return Parent->isTrulyVisible();
-	}
 
 	//! Sets the visible state of this element.
 	virtual void setVisible(bool visible)
@@ -368,6 +357,7 @@ public:
 	//! Returns true if this element was created as part of its parent control
 	virtual bool isSubElement() const
 	{
+		_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 		return IsSubElement;
 	}
 
@@ -393,6 +383,7 @@ public:
 	//! Returns true if this element can be focused by navigating with the tab key
 	bool isTabStop() const
 	{
+		_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 		return IsTabStop;
 	}
 
@@ -446,6 +437,7 @@ public:
 	//! Returns true if this element is a tab group.
 	bool isTabGroup() const
 	{
+		_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 		return IsTabGroup;
 	}
 
@@ -464,7 +456,7 @@ public:
 
 	//! Returns true if element is enabled
 	/** Currently elements do _not_ care about parent-states.
-		So if you want to affect children you have to enable/disable them all.
+		So if you want to affect childs you have to enable/disable them all.
 		The only exception to this are sub-elements which also check their parent.
 	*/
 	virtual bool isEnabled() const
@@ -472,6 +464,7 @@ public:
 		if ( isSubElement() && IsEnabled && getParent() )
 			return getParent()->isEnabled();
 
+		_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 		return IsEnabled;
 	}
 
@@ -547,6 +540,7 @@ public:
 			}
 		}
 
+		_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 		return false;
 	}
 
@@ -556,7 +550,7 @@ public:
 	virtual bool sendToBack(IGUIElement* child)
 	{
 		core::list<IGUIElement*>::Iterator it = Children.begin();
-		if (child == (*it)) // already there
+		if (child == (*it))	// already there
 			return true;
 		for (; it != Children.end(); ++it)
 		{
@@ -568,6 +562,7 @@ public:
 			}
 		}
 
+		_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 		return false;
 	}
 
@@ -619,7 +614,7 @@ public:
 
 		} while (child->Parent && child != this);
 
-
+		_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 		return child == this;
 	}
 
@@ -631,11 +626,9 @@ public:
 	\param first: element with the highest/lowest known tab order depending on search direction
 	\param closest: the closest match, depending on tab order and direction
 	\param includeInvisible: includes invisible elements in the search (default=false)
-	\param includeDisabled: includes disabled elements in the search (default=false)
 	\return true if successfully found an element, false to continue searching/fail */
 	bool getNextElement(s32 startOrder, bool reverse, bool group,
-		IGUIElement*& first, IGUIElement*& closest, bool includeInvisible=false,
-		bool includeDisabled=false) const
+		IGUIElement*& first, IGUIElement*& closest, bool includeInvisible=false) const
 	{
 		// we'll stop searching if we find this number
 		s32 wanted = startOrder + ( reverse ? -1 : 1 );
@@ -652,61 +645,59 @@ public:
 			if ( ( (*it)->isVisible() || includeInvisible ) &&
 				(group == true || (*it)->isTabGroup() == false) )
 			{
-				// ignore disabled, but children are checked (disabled is currently per element ignoring parent states)
-				if ( (*it)->isEnabled() || includeDisabled )
+				// only check tab stops and those with the same group status
+				if ((*it)->isTabStop() && ((*it)->isTabGroup() == group))
 				{
-					// only check tab stops and those with the same group status
-					if ((*it)->isTabStop() && ((*it)->isTabGroup() == group))
+					currentOrder = (*it)->getTabOrder();
+
+					// is this what we're looking for?
+					if (currentOrder == wanted)
 					{
-						currentOrder = (*it)->getTabOrder();
+						closest = *it;
+						return true;
+					}
 
-						// is this what we're looking for?
-						if (currentOrder == wanted)
-						{
-							closest = *it;
-							return true;
-						}
-
-						// is it closer than the current closest?
-						if (closest)
-						{
-							closestOrder = closest->getTabOrder();
-							if ( ( reverse && currentOrder > closestOrder && currentOrder < startOrder)
-								||(!reverse && currentOrder < closestOrder && currentOrder > startOrder))
-							{
-								closest = *it;
-							}
-						}
-						else
-						if ( (reverse && currentOrder < startOrder) || (!reverse && currentOrder > startOrder) )
+					// is it closer than the current closest?
+					if (closest)
+					{
+						closestOrder = closest->getTabOrder();
+						if ( ( reverse && currentOrder > closestOrder && currentOrder < startOrder)
+							||(!reverse && currentOrder < closestOrder && currentOrder > startOrder))
 						{
 							closest = *it;
 						}
+					}
+					else
+					if ( (reverse && currentOrder < startOrder) || (!reverse && currentOrder > startOrder) )
+					{
+						closest = *it;
+					}
 
-						// is it before the current first?
-						if (first)
-						{
-							closestOrder = first->getTabOrder();
+					// is it before the current first?
+					if (first)
+					{
+						closestOrder = first->getTabOrder();
 
-							if ( (reverse && closestOrder < currentOrder) || (!reverse && closestOrder > currentOrder) )
-							{
-								first = *it;
-							}
-						}
-						else
+						if ( (reverse && closestOrder < currentOrder) || (!reverse && closestOrder > currentOrder) )
 						{
 							first = *it;
 						}
+					}
+					else
+					{
+						first = *it;
 					}
 				}
 				// search within children
 				if ((*it)->getNextElement(startOrder, reverse, group, first, closest))
 				{
+					_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 					return true;
 				}
 			}
 			++it;
 		}
+		_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 		return false;
 	}
 
@@ -727,7 +718,7 @@ public:
 	you can overload this function and add a check for the type of the base-class additionally.
 	This allows for checks comparable to the dynamic_cast of c++ with enabled rtti.
 	Note that you can't do that by calling BaseClass::hasType(type), but you have to do an explicit
-	comparison check, because otherwise the base class usually just checks for the member variable
+	comparison check, because otherwise the base class usually just checks for the membervariable
 	Type which contains the type of your derived class.
 	*/
 	virtual bool hasType(EGUI_ELEMENT_TYPE type) const
@@ -743,7 +734,7 @@ public:
 	{
 		return GUIElementTypeNames[Type];
 	}
-
+	
 	//! Returns the name of the element.
 	/** \return Name as character string. */
 	virtual const c8* getName() const
@@ -773,7 +764,7 @@ public:
 	scripting languages, editors, debuggers or xml serialization purposes. */
 	virtual void serializeAttributes(io::IAttributes* out, io::SAttributeReadWriteOptions* options=0) const
 	{
-		out->addString("Name", Name.c_str());
+		out->addString("Name", Name.c_str());		
 		out->addInt("Id", ID );
 		out->addString("Caption", getText());
 		out->addRect("Rect", DesiredRect);
@@ -850,7 +841,7 @@ protected:
 			if (NoClip)
 			{
 				IGUIElement* p=this;
-				while (p->Parent)
+				while (p && p->Parent)
 					p = p->Parent;
 				parentAbsoluteClip = p->AbsoluteClippingRect;
 			}
@@ -965,21 +956,6 @@ protected:
 		}
 	}
 
-	// Inform gui-environment that an element got removed from the gui-graph
-	void sendRemoveEvent()
-	{
-		if ( Environment )
-		{
-			SEvent removeEvent;
-			removeEvent.EventType = EET_GUI_EVENT;
-			removeEvent.GUIEvent.Caller = this;
-			removeEvent.GUIEvent.Element = 0;
-			removeEvent.GUIEvent.EventType = EGET_ELEMENT_REMOVED;
-
-			Environment->postEventFromUser(removeEvent);
-		}
-	}
-
 protected:
 
 	//! List of all children of this element
@@ -1027,11 +1003,11 @@ protected:
 
 	//! tooltip
 	core::stringw ToolTipText;
-
-	//! users can set this for identifying the element by string
+	
+	//! users can set this for identificating the element by string
 	core::stringc Name;
 
-	//! users can set this for identifying the element by integer
+	//! users can set this for identificating the element by integer
 	s32 ID;
 
 	//! tab stop like in windows

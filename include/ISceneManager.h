@@ -110,7 +110,6 @@ namespace scene
 	class IMeshSceneNode;
 	class IMeshWriter;
 	class IMetaTriangleSelector;
-	class IOctreeSceneNode;
 	class IParticleSystemSceneNode;
 	class ISceneCollisionManager;
 	class ISceneLoader;
@@ -130,14 +129,14 @@ namespace scene
 		struct IShader;
 	} // end namespace quake3
 
-	//! The Scene Manager manages scene nodes, mesh resources, cameras and all the other stuff.
+	//! The Scene Manager manages scene nodes, mesh recources, cameras and all the other stuff.
 	/** All Scene nodes can be created only here. There is a always growing
 	list of scene nodes for lots of purposes: Indoor rendering scene nodes
 	like the Octree (addOctreeSceneNode()) or the terrain renderer
 	(addTerrainSceneNode()), different Camera scene nodes
 	(addCameraSceneNode(), addCameraSceneNodeMaya()), scene nodes for Light
 	(addLightSceneNode()), Billboards (addBillboardSceneNode()) and so on.
-	A scene node is a node in the hierarchical scene graph. Every scene node
+	A scene node is a node in the hierachical scene graph. Every scene node
 	may have children, which are other scene nodes. Children move relative
 	the their parents position. If the parent of a node is not visible, its
 	children won't be visible, too. In this way, it is for example easily
@@ -188,7 +187,12 @@ namespace scene
 		 *      architecture and calculating lighting. Irrlicht can
 		 *      directly import .csm files thanks to the IrrCSM library
 		 *      created by Saurav Mohapatra which is now integrated
-		 *      directly in Irrlicht.
+		 *      directly in Irrlicht. If you are using this loader,
+		 *      please note that you'll have to set the path of the
+		 *      textures before loading .csm files. You can do this
+		 *      using
+		 *      SceneManager-&gt;getParameters()-&gt;setAttribute(scene::CSM_TEXTURE_PATH,
+		 *      &quot;path/to/your/textures&quot;);</TD>
 		 *  </TR>
 		 *  <TR>
 		 *    <TD>COLLADA (.dae, .xml)</TD>
@@ -228,8 +232,9 @@ namespace scene
 		 *        game-development. With this loader, it is possible to
 		 *        directly load all geometry is as well as textures and
 		 *        lightmaps from .dmf files. To set texture and
-		 *        material paths, see scene::DMF_USE_MATERIALS_DIRS.
-		 *        It is also possible to flip the alpha texture by setting
+		 *        material paths, see scene::DMF_USE_MATERIALS_DIRS and
+		 *        scene::DMF_TEXTURE_PATH. It is also possible to flip
+		 *        the alpha texture by setting
 		 *        scene::DMF_FLIP_ALPHA_TEXTURES to true and to set the
 		 *        material transparent reference value by setting
 		 *        scene::DMF_ALPHA_CHANNEL_REF to a float between 0 and
@@ -237,7 +242,7 @@ namespace scene
 		 *        loader, I just changed some parts of it. Thanks to
 		 *        Salvatore for his work and for allowing me to use his
 		 *        code in Irrlicht and put it under Irrlicht's license.
-		 *        For newer and more enhanced versions of the loader,
+		 *        For newer and more enchanced versions of the loader,
 		 *        take a look at delgine.com.
 		 *    </TD>
 		 *  </TR>
@@ -282,7 +287,7 @@ namespace scene
 		 *    <TD>Milkshape (.ms3d)</TD>
 		 *    <TD>.MS3D files contain models and sometimes skeletal
 		 *      animations from the Milkshape 3D modeling and animation
-		 *      software. Like the other skeletal mesh loaders, joints
+		 *      software. Like the other skeletal mesh loaders, oints
 		 *      are exposed via the ISkinnedMesh animated mesh type.</TD>
 		 *  </TR>
 		 *  <TR>
@@ -292,7 +297,12 @@ namespace scene
 		 *        3D packages. With this built-in importer, Irrlicht
 		 *        can read and display those files directly. This
 		 *        loader was written by Zhuck Dimitry who also created
-		 *        the whole My3DTools package.
+		 *        the whole My3DTools package. If you are using this
+		 *        loader, please note that you can set the path of the
+		 *        textures before loading .my3d files. You can do this
+		 *        using
+		 *        SceneManager-&gt;getParameters()-&gt;setAttribute(scene::MY3D_TEXTURE_PATH,
+		 *        &quot;path/to/your/textures&quot;);
 		 *        </TD>
 		 *    </TR>
 		 *    <TR>
@@ -321,9 +331,13 @@ namespace scene
 		 *      <TD>LMTools is a set of tools (Windows &amp; Linux) for
 		 *        creating lightmaps. Irrlicht can directly read .lmts
 		 *        files thanks to<br> the importer created by Jonas
-		 *        Petersen.
+		 *        Petersen. If you are using this loader, please note
+		 *        that you can set the path of the textures before
+		 *        loading .lmts files. You can do this using
+		 *        SceneManager-&gt;getParameters()-&gt;setAttribute(scene::LMTS_TEXTURE_PATH,
+		 *        &quot;path/to/your/textures&quot;);
 		 *        Notes for<br> this version of the loader:<br>
-		 *        - It does not recognize/support user data in the
+		 *        - It does not recognise/support user data in the
 		 *          *.lmts files.<br>
 		 *        - The TGAs generated by LMTools don't work in
 		 *          Irrlicht for some reason (the textures are upside
@@ -379,11 +393,10 @@ namespace scene
 		 * If you would like to implement and add your own file format loader to Irrlicht,
 		 * see addExternalMeshLoader().
 		 * \param filename: Filename of the mesh to load.
-		 * \param alternativeCacheName: In case you want to have the mesh under another name in the cache (to create real copies)
 		 * \return Null if failed, otherwise pointer to the mesh.
 		 * This pointer should not be dropped. See IReferenceCounted::drop() for more information.
 		 **/
-		virtual IAnimatedMesh* getMesh(const io::path& filename, const io::path& alternativeCacheName=io::path("")) = 0;
+		virtual IAnimatedMesh* getMesh(const io::path& filename) = 0;
 
 		//! Get pointer to an animateable mesh. Loads the file if not loaded already.
 		/** Works just as getMesh(const char* filename). If you want to
@@ -394,7 +407,7 @@ namespace scene
 		IReferenceCounted::drop() for more information. */
 		virtual IAnimatedMesh* getMesh(io::IReadFile* file) = 0;
 
-		//! Get interface to the mesh cache which is shared between all existing scene managers.
+		//! Get interface to the mesh cache which is shared beween all existing scene managers.
 		/** With this interface, it is possible to manually add new loaded
 		meshes (if ISceneManager::getMesh() is not sufficient), to remove them and to iterate
 		through already loaded meshes. */
@@ -443,7 +456,7 @@ namespace scene
 		\param id: Id of the node. This id can be used to identify the scene node.
 		\param position: Position of the space relative to its parent
 		where the scene node will be placed.
-		\param rotation: Initial rotation of the scene node.
+		\param rotation: Initital rotation of the scene node.
 		\param scale: Initial scale of the scene node.
 		\return Pointer to the created test scene node. This
 		pointer should not be dropped. See IReferenceCounted::drop()
@@ -463,7 +476,7 @@ namespace scene
 		\param id: Id of the node. This id can be used to identify the scene node.
 		\param position: Position of the space relative to its parent
 		where the scene node will be placed.
-		\param rotation: Initial rotation of the scene node.
+		\param rotation: Initital rotation of the scene node.
 		\param scale: Initial scale of the scene node.
 		\return Pointer to the created test scene node. This
 		pointer should not be dropped. See IReferenceCounted::drop()
@@ -480,7 +493,7 @@ namespace scene
 		\param id: Id of the node. This id can be used to identify the scene node.
 		\param position: Position of the space relative to its parent where the
 		scene node will be placed.
-		\param rotation: Initial rotation of the scene node.
+		\param rotation: Initital rotation of the scene node.
 		\param scale: Initial scale of the scene node.
 		\param alsoAddIfMeshPointerZero: Add the scene node even if a 0 pointer is passed.
 		\return Pointer to the created scene node.
@@ -498,7 +511,7 @@ namespace scene
 		\param id: Id of the node. This id can be used to identify the scene node.
 		\param position: Position of the space relative to its parent where the
 		scene node will be placed.
-		\param rotation: Initial rotation of the scene node.
+		\param rotation: Initital rotation of the scene node.
 		\param scale: Initial scale of the scene node.
 		\param alsoAddIfMeshPointerZero: Add the scene node even if a 0 pointer is passed.
 		\return Pointer to the created scene node.
@@ -514,13 +527,13 @@ namespace scene
 		is used.
 		\param waveHeight: Height of the water waves.
 		\param waveSpeed: Speed of the water waves.
-		\param waveLength: Length of a water wave.
+		\param waveLength: Lenght of a water wave.
 		\param mesh: Pointer to the loaded static mesh to be displayed with water waves on it.
 		\param parent: Parent of the scene node. Can be NULL if no parent.
 		\param id: Id of the node. This id can be used to identify the scene node.
 		\param position: Position of the space relative to its parent where the
 		scene node will be placed.
-		\param rotation: Initial rotation of the scene node.
+		\param rotation: Initital rotation of the scene node.
 		\param scale: Initial scale of the scene node.
 		\return Pointer to the created scene node.
 		This pointer should not be dropped. See IReferenceCounted::drop() for more information. */
@@ -534,7 +547,7 @@ namespace scene
 
 		//! Adds a scene node for rendering using a octree to the scene graph.
 		/** This a good method for rendering
-		scenes with lots of geometry. The octree is built on the fly from the mesh.
+		scenes with lots of geometry. The Octree is built on the fly from the mesh.
 		\param mesh: The mesh containing all geometry from which the octree will be build.
 		If this animated mesh has more than one frames in it, the first frame is taken.
 		\param parent: Parent node of the octree node.
@@ -543,14 +556,22 @@ namespace scene
 		If a node gets less polys than this value it will not be split into
 		smaller nodes.
 		\param alsoAddIfMeshPointerZero: Add the scene node even if a 0 pointer is passed.
-		\return Pointer to the octree if successful, otherwise 0.
+		\return Pointer to the Octree if successful, otherwise 0.
 		This pointer should not be dropped. See IReferenceCounted::drop() for more information. */
-		virtual IOctreeSceneNode* addOctreeSceneNode(IAnimatedMesh* mesh, ISceneNode* parent=0,
+		virtual IMeshSceneNode* addOctreeSceneNode(IAnimatedMesh* mesh, ISceneNode* parent=0,
 			s32 id=-1, s32 minimalPolysPerNode=512, bool alsoAddIfMeshPointerZero=false) = 0;
 
 		//! Adds a scene node for rendering using a octree to the scene graph.
+		/** \deprecated Use addOctreeSceneNode instead. This method may be removed by Irrlicht 1.9. */
+		_IRR_DEPRECATED_ IMeshSceneNode* addOctTreeSceneNode(IAnimatedMesh* mesh, ISceneNode* parent=0,
+			s32 id=-1, s32 minimalPolysPerNode=512, bool alsoAddIfMeshPointerZero=false)
+		{
+			return addOctreeSceneNode(mesh, parent, id, minimalPolysPerNode, alsoAddIfMeshPointerZero);
+		}
+
+		//! Adds a scene node for rendering using a octree to the scene graph.
 		/** This a good method for rendering scenes with lots of
-		geometry. The octree is built on the fly from the mesh, much
+		geometry. The Octree is built on the fly from the mesh, much
 		faster then a bsp tree.
 		\param mesh: The mesh containing all geometry from which the octree will be build.
 		\param parent: Parent node of the octree node.
@@ -561,8 +582,16 @@ namespace scene
 		\param alsoAddIfMeshPointerZero: Add the scene node even if a 0 pointer is passed.
 		\return Pointer to the octree if successful, otherwise 0.
 		This pointer should not be dropped. See IReferenceCounted::drop() for more information. */
-		virtual IOctreeSceneNode* addOctreeSceneNode(IMesh* mesh, ISceneNode* parent=0,
+		virtual IMeshSceneNode* addOctreeSceneNode(IMesh* mesh, ISceneNode* parent=0,
 			s32 id=-1, s32 minimalPolysPerNode=256, bool alsoAddIfMeshPointerZero=false) = 0;
+
+		//! Adds a scene node for rendering using a octree to the scene graph.
+		/** \deprecated Use addOctreeSceneNode instead. This method may be removed by Irrlicht 1.9. */
+		_IRR_DEPRECATED_ IMeshSceneNode* addOctTreeSceneNode(IMesh* mesh, ISceneNode* parent=0,
+			s32 id=-1, s32 minimalPolysPerNode=256, bool alsoAddIfMeshPointerZero=false)
+		{
+			return addOctreeSceneNode(mesh, parent, id, minimalPolysPerNode, alsoAddIfMeshPointerZero);
+		}
 
 		//! Adds a camera scene node to the scene graph and sets it as active camera.
 		/** This camera does not react on user input like for example the one created with
@@ -644,7 +673,7 @@ namespace scene
 		camera = sceneManager->addCameraSceneNodeFPS(0, 100, 500, -1, keyMap, 8);
 		\endcode
 		\param parent: Parent scene node of the camera. Can be null.
-		\param rotateSpeed: Speed in degrees with which the camera is
+		\param rotateSpeed: Speed in degress with which the camera is
 		rotated. This can be done only with the mouse.
 		\param moveSpeed: Speed in units per millisecond with which
 		the camera is moved. Movement is done with the cursor keys.
@@ -764,14 +793,14 @@ namespace scene
 
 		//! Adds a particle system scene node to the scene graph.
 		/** \param withDefaultEmitter: Creates a default working point emitter
-		which emits some particles. Set this to true to see a particle system
+		which emitts some particles. Set this to true to see a particle system
 		in action. If set to false, you'll have to set the emitter you want by
 		calling IParticleSystemSceneNode::setEmitter().
 		\param parent: Parent of the scene node. Can be NULL if no parent.
 		\param id: Id of the node. This id can be used to identify the scene node.
 		\param position: Position of the space relative to its parent where the
 		scene node will be placed.
-		\param rotation: Initial rotation of the scene node.
+		\param rotation: Initital rotation of the scene node.
 		\param scale: Initial scale of the scene node.
 		\return Pointer to the created scene node.
 		This pointer should not be dropped. See IReferenceCounted::drop() for more information. */
@@ -807,7 +836,7 @@ namespace scene
 		-2^LOD, so for LOD 1, the step taken is 2, for LOD 2, the step
 		taken is 4, LOD 3 - 8, etc. The step can be no larger than
 		the size of the patch, so having a LOD of 8, with a patch size
-		of 17, is asking the algorithm to generate indices every 2^8 (
+		of 17, is asking the algoritm to generate indices every 2^8 (
 		256 ) vertices, which is not possible with a patch size of 17.
 		The maximum LOD for a patch size of 17 is 2^4 ( 16 ). So,
 		with a MaxLOD of 5, you'll have LOD 0 ( full detail ), LOD 1 (
@@ -849,7 +878,7 @@ namespace scene
 
 		//! Adds a terrain scene node to the scene graph.
 		/** Just like the other addTerrainSceneNode() method, but takes an IReadFile
-		pointer as parameter for the heightmap. For more information take a look
+		pointer as parameter for the heightmap. For more informations take a look
 		at the other function.
 		\param heightMapFile: The file handle to read vertex data from. This should
 		be a gray scale bitmap.
@@ -946,9 +975,9 @@ namespace scene
 		to be able to retrieve the mesh later with ISceneManager::getMesh().
 		\param tileSize: Size of a tile of the mesh. (10.0f, 10.0f) would be a
 		good value to start, for example.
-		\param tileCount: Specifies how much tiles there will be. If you specify
+		\param tileCount: Specifies how much tiles there will be. If you specifiy
 		for example that a tile has the size (10.0f, 10.0f) and the tileCount is
-		(10,10), than you get a field of 100 tiles which has the dimension 100.0f x 100.0f.
+		(10,10), than you get a field of 100 tiles which has the dimension 100.0fx100.0f.
 		\param material: Material of the hill mesh.
 		\param hillHeight: Height of the hills. If you specify a negative value
 		you will get holes instead of hills. If the height is 0, no hills will be
@@ -985,7 +1014,7 @@ namespace scene
 		of triangles created depends on the size of this texture, so use a small
 		heightmap to increase rendering speed.
 		\param stretchSize: Parameter defining how big a is pixel on the heightmap.
-		\param maxHeight: Defines how high a white pixel on the heightmap is.
+		\param maxHeight: Defines how high a white pixel on the heighmap is.
 		\param defaultVertexBlockSize: Defines the initial dimension between vertices.
 		\return Null if the creation failed. The reason could be that you
 		specified some invalid parameters, that a mesh with that name already
@@ -1002,7 +1031,7 @@ namespace scene
 		\param vtxColorCylinder color of the cylinder
 		\param vtxColorCone color of the cone
 		\param tesselationCylinder Number of quads the cylinder side consists of
-		\param tesselationCone Number of triangles the cone's roof consists of
+		\param tesselationCone Number of triangles the cone's roof consits of
 		\param height Total height of the arrow
 		\param cylinderHeight Total height of the cylinder, should be lesser than total height
 		\param widthCylinder Diameter of the cylinder
@@ -1082,10 +1111,10 @@ namespace scene
 
 		//! Get scene nodes by type.
 		/** \param type: Type of scene node to find (ESNT_ANY will return all child nodes).
-		\param outNodes: results will be added to this array (outNodes is not cleared).
-		\param start: Scene node to start from. This node and all children of this scene
-		node are checked (recursively, so also children of children, etc). If null is specified, 
-		the root scene node is taken as start-node. */
+		\param outNodes: array to be filled with results.
+		\param start: Scene node to start from. All children of this scene
+		node are searched. If null is specified, the root scene node is
+		taken. */
 		virtual void getSceneNodesFromType(ESCENE_NODE_TYPE type,
 				core::array<scene::ISceneNode*>& outNodes,
 				ISceneNode* start=0) = 0;
@@ -1119,12 +1148,6 @@ namespace scene
 		virtual u32 registerNodeForRendering(ISceneNode* node,
 			E_SCENE_NODE_RENDER_PASS pass = ESNRP_AUTOMATIC) = 0;
 
-		//! Clear all nodes which are currently registered for rendering
-		/** Usually you don't have to care about this as drawAll will clear nodes
-		after rendering them. But sometimes you might have to manully reset this.
-		For example when you deleted nodes between registering and rendering. */
-		virtual void clearAllRegisteredNodesForRendering() = 0;
-
 		//! Draws all the scene nodes.
 		/** This can only be invoked between
 		IVideoDriver::beginScene() and IVideoDriver::endScene(). Please note that
@@ -1147,7 +1170,7 @@ namespace scene
 		\param direction: Specifies the upvector used for alignment of the mesh.
 		\param startPosition: The position on the circle where the animator will
 		begin. Value is in multiples of a circle, i.e. 0.5 is half way around. (phase)
-		\param radiusEllipsoid: if radiusEllipsoid != 0 then radius2 from a ellipsoid
+		\param radiusEllipsoid: if radiusEllipsoid != 0 then radius2 froms a ellipsoid
 		begin. Value is in multiples of a circle, i.e. 0.5 is half way around. (phase)
 		\return The animator. Attach it to a scene node with ISceneNode::addAnimator()
 		and the animator will animate it.
@@ -1163,7 +1186,7 @@ namespace scene
 		//! Creates a fly straight animator, which lets the attached scene node fly or move along a line between two points.
 		/** \param startPoint: Start point of the line.
 		\param endPoint: End point of the line.
-		\param timeForWay: Time in milliseconds how long the node should need to
+		\param timeForWay: Time in milli seconds how long the node should need to
 		move from the start point to the end point.
 		\param loop: If set to false, the node stops when the end point is reached.
 		If loop is true, the node begins again at the start.
@@ -1216,7 +1239,7 @@ namespace scene
 		core::vector3df radius = box.MaxEdge - box.getCenter();
 		\endcode
 		\param gravityPerSecond: Sets the gravity of the environment, as an acceleration in
-		units per second per second. If your units are equivalent to meters, then
+		units per second per second. If your units are equivalent to metres, then
 		core::vector3df(0,-10.0f,0) would give an approximately realistic gravity.
 		You can disable gravity by setting it to core::vector3df(0,0,0).
 		\param ellipsoidTranslation: By default, the ellipsoid for collision detection is created around
@@ -1237,9 +1260,9 @@ namespace scene
 
 		//! Creates a follow spline animator.
 		/** The animator modifies the position of
-		the attached scene node to make it follow a Hermite spline.
-		It uses a subset of Hermite splines: either cardinal splines
-		(tightness != 0.5) or Catmull-Rom-splines (tightness == 0.5).
+		the attached scene node to make it follow a hermite spline.
+		It uses a subset of hermite splines: either cardinal splines
+		(tightness != 0.5) or catmull-rom-splines (tightness == 0.5).
 		The animator moves from one control point to the next in
 		1/speed seconds. This code was sent in by Matthias Gall.
 		If you no longer need the animator, you should call ISceneNodeAnimator::drop().
@@ -1253,7 +1276,7 @@ namespace scene
 		can be used for doing collision detection. Don't use this selector
 		for a huge amount of triangles like in Quake3 maps.
 		Instead, use for example ISceneManager::createOctreeTriangleSelector().
-		Please note that the created triangle selector is not automatically attached
+		Please note that the created triangle selector is not automaticly attached
 		to the scene node. You will have to call ISceneNode::setTriangleSelector()
 		for this. To create and attach a triangle selector is done like this:
 		\code
@@ -1263,30 +1286,19 @@ namespace scene
 		s->drop();
 		\endcode
 		\param mesh: Mesh of which the triangles are taken.
-		\param node: Scene node of which transformation is used.
-		\param separateMeshbuffers: When true it's possible to get information which meshbuffer
-		got hit in collision tests. But has a slight speed cost.
+		\param node: Scene node of which visibility and transformation is used.
 		\return The selector, or null if not successful.
 		If you no longer need the selector, you should call ITriangleSelector::drop().
 		See IReferenceCounted::drop() for more information. */
-		virtual ITriangleSelector* createTriangleSelector(IMesh* mesh, ISceneNode* node, bool separateMeshbuffers=false) = 0;
-
-		//! Creates a simple ITriangleSelector, based on a meshbuffer.
-		/**
-		This is a static selector which won't update when the mesh changes.
-		\param meshBuffer Triangles of that meshbuffer are used
-		\param materialIndex If you pass a material index that index can be returned by the triangle selector.
-		\para node: Scene node of which transformation is used.
-		*/
-		virtual ITriangleSelector* createTriangleSelector(const IMeshBuffer* meshBuffer, irr::u32 materialIndex, ISceneNode* node) = 0;
+		virtual ITriangleSelector* createTriangleSelector(IMesh* mesh, ISceneNode* node) = 0;
 
 		//! Creates a simple ITriangleSelector, based on an animated mesh scene node.
 		/** Details of the mesh associated with the node will be extracted internally.
+		Call ITriangleSelector::update() to have the triangle selector updated based
+		on the current frame of the animated mesh scene node.
 		\param node The animated mesh scene node from which to build the selector
-		\param separateMeshbuffers: When true it's possible to get information which meshbuffer
-		got hit in collision tests. But has a slight speed cost.
 		*/
-		virtual ITriangleSelector* createTriangleSelector(IAnimatedMeshSceneNode* node, bool separateMeshbuffers=false) = 0;
+		virtual ITriangleSelector* createTriangleSelector(IAnimatedMeshSceneNode* node) = 0;
 
 
 		//! Creates a simple dynamic ITriangleSelector, based on a axis aligned bounding box.
@@ -1304,7 +1316,7 @@ namespace scene
 		/** Triangle selectors
 		can be used for doing collision detection. This triangle selector is
 		optimized for huge amounts of triangle, it organizes them in an octree.
-		Please note that the created triangle selector is not automatically attached
+		Please note that the created triangle selector is not automaticly attached
 		to the scene node. You will have to call ISceneNode::setTriangleSelector()
 		for this. To create and attach a triangle selector is done like this:
 		\code
@@ -1313,44 +1325,17 @@ namespace scene
 		yourSceneNode->setTriangleSelector(s);
 		s->drop();
 		\endcode
-		For more information and examples on this, take a look at the collision
+		For more informations and examples on this, take a look at the collision
 		tutorial in the SDK.
 		\param mesh: Mesh of which the triangles are taken.
 		\param node: Scene node of which visibility and transformation is used.
 		\param minimalPolysPerNode: Specifies the minimal polygons contained a octree node.
-		If a node gets less polys than this value, it will not be split into
+		If a node gets less polys the this value, it will not be splitted into
 		smaller nodes.
 		\return The selector, or null if not successful.
 		If you no longer need the selector, you should call ITriangleSelector::drop().
 		See IReferenceCounted::drop() for more information. */
 		virtual ITriangleSelector* createOctreeTriangleSelector(IMesh* mesh,
-			ISceneNode* node, s32 minimalPolysPerNode=32) = 0;
-
-		//! Creates a Triangle Selector for a single meshbuffer, optimized by an octree.
-		/** Triangle selectors
-		can be used for doing collision detection. This triangle selector is
-		optimized for huge amounts of triangle, it organizes them in an octree.
-		Please note that the created triangle selector is not automatically attached
-		to the scene node. You will have to call ISceneNode::setTriangleSelector()
-		for this. To create and attach a triangle selector is done like this:
-		\code
-		ITriangleSelector* s = sceneManager->createOctreeTriangleSelector(yourMesh,
-				yourSceneNode);
-		yourSceneNode->setTriangleSelector(s);
-		s->drop();
-		\endcode
-		For more information and examples on this, take a look at the collision
-		tutorial in the SDK.
-		\param meshBuffer: Meshbuffer of which the triangles are taken.
-		\param materialIndex: Setting this value allows the triangle selector to return the material index
-		\param node: Scene node of which visibility and transformation is used.
-		\param minimalPolysPerNode: Specifies the minimal polygons contained a octree node.
-		If a node gets less polys than this value, it will not be split into
-		smaller nodes.
-		\return The selector, or null if not successful.
-		If you no longer need the selector, you should call ITriangleSelector::drop().
-		See IReferenceCounted::drop() for more information. */
-		virtual ITriangleSelector* createOctreeTriangleSelector(IMeshBuffer* meshBuffer, irr::u32 materialIndex,
 			ISceneNode* node, s32 minimalPolysPerNode=32) = 0;
 
 		//! //! Creates a Triangle Selector, optimized by an octree.
@@ -1427,14 +1412,14 @@ namespace scene
 		virtual IMeshManipulator* getMeshManipulator() = 0;
 
 		//! Adds a scene node to the deletion queue.
-		/** The scene node is immediately
+		/** The scene node is immediatly
 		deleted when it's secure. Which means when the scene node does not
 		execute animators and things like that. This method is for example
 		used for deleting scene nodes by their scene node animators. In
 		most other cases, a ISceneNode::remove() call is enough, using this
 		deletion queue is not necessary.
 		See ISceneManager::createDeleteAnimator() for details.
-		\param node: Node to delete. */
+		\param node: Node to detete. */
 		virtual void addToDeletionQueue(ISceneNode* node) = 0;
 
 		//! Posts an input event to the environment.
@@ -1448,7 +1433,10 @@ namespace scene
 
 		//! Get interface to the parameters set in this scene.
 		/** String parameters can be used by plugins and mesh loaders.
-		See	COLLADA_CREATE_SCENE_INSTANCES and DMF_USE_MATERIALS_DIRS */
+		For example the CMS and LMTS loader want a parameter named 'CSM_TexturePath'
+		and 'LMTS_TexturePath' set to the path were attached textures can be found. See
+		CSM_TEXTURE_PATH, LMTS_TEXTURE_PATH, MY3D_TEXTURE_PATH,
+		COLLADA_CREATE_SCENE_INSTANCES, DMF_TEXTURE_PATH and DMF_USE_MATERIALS_DIRS*/
 		virtual io::IAttributes* getParameters() = 0;
 
 		//! Get current render pass.
@@ -1467,7 +1455,7 @@ namespace scene
 
 		//! Adds a scene node factory to the scene manager.
 		/** Use this to extend the scene manager with new scene node types which it should be
-		able to create automatically, for example when loading data from xml files. */
+		able to create automaticly, for example when loading data from xml files. */
 		virtual void registerSceneNodeFactory(ISceneNodeFactory* factoryToAdd) = 0;
 
 		//! Get amount of registered scene node factories.
@@ -1485,7 +1473,7 @@ namespace scene
 
 		//! Adds a scene node animator factory to the scene manager.
 		/** Use this to extend the scene manager with new scene node animator types which it should be
-		able to create automatically, for example when loading data from xml files. */
+		able to create automaticly, for example when loading data from xml files. */
 		virtual void registerSceneNodeAnimatorFactory(ISceneNodeAnimatorFactory* factoryToAdd) = 0;
 
 		//! Get amount of registered scene node animator factories.
@@ -1619,7 +1607,7 @@ namespace scene
 		using ISceneManager::saveScene().
 		\param file File where the scene is loaded from.
 		\param userDataSerializer If you want to load user data
-		saved in that file for some scene nodes in the file,
+		possibily saved in that file for some scene nodes in the file,
 		implement the ISceneUserDataSerializer interface and provide it
 		as parameter here. Otherwise, simply specify 0 as this
 		parameter.
@@ -1649,12 +1637,6 @@ namespace scene
 		/** \param[in] lightManager: the new callbacks manager. You may pass 0 to remove the
 			current callbacks manager and restore the default behavior. */
 		virtual void setLightManager(ILightManager* lightManager) = 0;
-
-		//! Get current render pass.
-		virtual E_SCENE_NODE_RENDER_PASS getCurrentRenderPass() const =0;
-
-		//! Set current render pass.
-		virtual void setCurrentRenderPass(E_SCENE_NODE_RENDER_PASS nextPass) =0;
 
 		//! Get an instance of a geometry creator.
 		/** The geometry creator provides some helper methods to create various types of

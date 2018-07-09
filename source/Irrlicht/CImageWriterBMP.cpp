@@ -94,7 +94,7 @@ bool CImageWriterBMP::writeImage(io::IWriteFile* file, IImage* image, u32 param)
 	if (file->write(&imageHeader, sizeof(imageHeader)) != sizeof(imageHeader))
 		return false;
 
-	u8* scan_lines = (u8*)image->getData();
+	u8* scan_lines = (u8*)image->lock();
 	if (!scan_lines)
 		return false;
 
@@ -105,7 +105,7 @@ bool CImageWriterBMP::writeImage(io::IWriteFile* file, IImage* image, u32 param)
 	u32 row_stride = (pixel_size * imageHeader.Width);
 
 	// length of one row in bytes, rounded up to nearest 4-byte boundary
-	size_t row_size = ((3 * imageHeader.Width) + 3) & ~3;
+	s32 row_size = ((3 * imageHeader.Width) + 3) & ~3;
 
 	// allocate and clear memory for our scan line
 	u8* row_pointer = new u8[row_size];
@@ -126,6 +126,9 @@ bool CImageWriterBMP::writeImage(io::IWriteFile* file, IImage* image, u32 param)
 
 	// clean up our scratch area
 	delete [] row_pointer;
+
+	// give back image handle
+	image->unlock();
 
 	return y < 0;
 }

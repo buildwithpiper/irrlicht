@@ -211,7 +211,7 @@ irr::core::stringw CColladaMeshWriterNames::nameForMaterial(const video::SMateri
 irr::core::stringw CColladaMeshWriterNames::nameForPtr(const void* ptr) const
 {
 	wchar_t buf[32];
-	swprintf_irr(buf, 32, L"%p", ptr);
+	swprintf(buf, 32, L"%p", ptr);
 	return irr::core::stringw(buf);
 }
 
@@ -661,20 +661,11 @@ void CColladaMeshWriter::writeNodeCameras(irr::scene::ISceneNode * node)
 			Writer->writeElement(L"orthographic", false);
 			Writer->writeLineBreak();
 
-			irr::core::matrix4 projMat( cameraNode->getProjectionMatrix() );
-			irr::f32 xmag = 2.f/projMat[0];
-			irr::f32 ymag = 2.f/projMat[5];
-
-			// Note that Irrlicht camera does not update near/far when setting the projection matrix,
-			// so we have to calculate that here (at least currently - maybe camera code will be updated at some time).
-			irr::f32 nearMinusFar = -1.f/projMat[10];
-			irr::f32 zNear = projMat[14]*nearMinusFar;
-			irr::f32 zFar = 1.f/projMat[10] + zNear;
-
-			writeNode(L"xmag", core::stringw(xmag).c_str());
-			writeNode(L"ymag", core::stringw(ymag).c_str());
-			writeNode(L"znear", core::stringw(zNear).c_str());
-			writeNode(L"zfar", core::stringw(zFar).c_str());
+//			writeNode(L"xmag", core::stringw("1.0").c_str());	// TODO: do we need xmag, ymag?
+//			writeNode(L"ymag", core::stringw("1.0").c_str());
+			writeNode(L"aspect_ratio", core::stringw(cameraNode->getAspectRatio()).c_str());
+			writeNode(L"znear", core::stringw(cameraNode->getNearValue()).c_str());
+			writeNode(L"zfar", core::stringw(cameraNode->getFarValue()).c_str());
 
 			Writer->writeClosingTag(L"orthographic");
 			Writer->writeLineBreak();
@@ -749,29 +740,20 @@ void CColladaMeshWriter::writeSceneNode(irr::scene::ISceneNode * node )
 	{
 		writeMatrixElement(node->getRelativeTransformation());
 	}
-	else if ( isCamera(node) )
-	{
-		// TODO: We do not handle the case when ICameraSceneNode::getTargetAndRotationBinding() is false. Probably we would have to create a second
-		// node to do that.
-
-		// Note: We can't use rotations for the camera as Irrlicht does not regard the up-vector in rotations so far.
-		// We could maybe use projection matrices, but avoiding them might allow us to get rid of some DummyTransformationSceneNodes on
-		// import in the future. So that's why we use the lookat element instead.
-
-		ICameraSceneNode * camNode = static_cast<ICameraSceneNode*>(node);
-		writeLookAtElement(camNode->getPosition(), camNode->getTarget(), camNode->getUpVector());
-	}
 	else
 	{
-		writeTranslateElement( node->getPosition() );
-
 		irr::core::vector3df rot(node->getRotation());
-		core::quaternion quat(rot*core::DEGTORAD);
-		f32 angle;
-		core::vector3df axis;
-		quat.toAngleAxis(angle, axis);
-		writeRotateElement( axis, angle*core::RADTODEG );
+		if ( isCamera(node) && !static_cast<ICameraSceneNode*>(node)->getTargetAndRotationBinding() )
+		{
+			ICameraSceneNode * camNode = static_cast<ICameraSceneNode*>(node);
+			const core::vector3df toTarget = camNode->getTarget() - camNode->getAbsolutePosition();
+			rot = toTarget.getHorizontalAngle();
+		}
 
+		writeTranslateElement( node->getPosition() );
+		writeRotateElement( irr::core::vector3df(1.f, 0.f, 0.f), rot.X );
+		writeRotateElement( irr::core::vector3df(0.f, 1.f, 0.f), rot.Y );
+		writeRotateElement( irr::core::vector3df(0.f, 0.f, 1.f), rot.Z );
 		writeScaleElement( node->getScale() );
 	}
 
@@ -984,7 +966,7 @@ bool CColladaMeshWriter::hasSecondTextureCoordinates(video::E_VERTEX_TYPE type) 
 void CColladaMeshWriter::writeVector(const irr::core::vector3df& vec)
 {
 	wchar_t tmpbuf[255];
-	swprintf_irr(tmpbuf, 255, L"%f %f %f", vec.X, vec.Y, vec.Z);
+	swprintf(tmpbuf, 255, L"%f %f %f", vec.X, vec.Y, vec.Z);
 
 	Writer->writeText(tmpbuf);
 }
@@ -993,7 +975,7 @@ void CColladaMeshWriter::writeUv(const irr::core::vector2df& vec)
 {
 	// change handedness
 	wchar_t tmpbuf[255];
-	swprintf_irr(tmpbuf, 255, L"%f %f", vec.X, 1.f-vec.Y);
+	swprintf(tmpbuf, 255, L"%f %f", vec.X, 1.f-vec.Y);
 
 	Writer->writeText(tmpbuf);
 }
@@ -1001,7 +983,7 @@ void CColladaMeshWriter::writeUv(const irr::core::vector2df& vec)
 void CColladaMeshWriter::writeVector(const irr::core::vector2df& vec)
 {
 	wchar_t tmpbuf[255];
-	swprintf_irr(tmpbuf, 255, L"%f %f", vec.X, vec.Y);
+	swprintf(tmpbuf, 255, L"%f %f", vec.X, vec.Y);
 
 	Writer->writeText(tmpbuf);
 }
@@ -1010,9 +992,9 @@ void CColladaMeshWriter::writeColor(const irr::video::SColorf& colorf, bool writ
 {
 	wchar_t tmpbuf[255];
 	if ( writeAlpha )
-		swprintf_irr(tmpbuf, 255, L"%f %f %f %f", colorf.getRed(), colorf.getGreen(), colorf.getBlue(), colorf.getAlpha());
+		swprintf(tmpbuf, 255, L"%f %f %f %f", colorf.getRed(), colorf.getGreen(), colorf.getBlue(), colorf.getAlpha());
 	else
-		swprintf_irr(tmpbuf, 255, L"%f %f %f", colorf.getRed(), colorf.getGreen(), colorf.getBlue());
+		swprintf(tmpbuf, 255, L"%f %f %f", colorf.getRed(), colorf.getGreen(), colorf.getBlue());
 
 	Writer->writeText(tmpbuf);
 }
@@ -1121,7 +1103,7 @@ irr::core::stringw CColladaMeshWriter::nameForMaterial(const video::SMaterial & 
 irr::core::stringw CColladaMeshWriter::nameForMaterialSymbol(const scene::IMesh* mesh, int materialId) const
 {
 	wchar_t buf[100];
-	swprintf_irr(buf, 100, L"mat_symb_%p_%d", mesh, materialId);
+	swprintf(buf, 100, L"mat_symb_%p_%d", mesh, materialId);
 	return irr::core::stringw(buf);
 }
 
@@ -1205,20 +1187,6 @@ irr::core::stringw CColladaMeshWriter::toNCName(const irr::core::stringw& oldStr
 		}
 	}
 	return result;
-}
-
-const irr::core::stringw* CColladaMeshWriter::findGeometryNameForNode(ISceneNode* node)
-{
-	IMesh* mesh = getProperties()->getMesh(node);
-	if ( !mesh )
-		return NULL;
-
-	MeshNode * n = Meshes.find(mesh);
-	if ( !n )
-		return NULL;
-
-	const SColladaMesh& colladaMesh = n->getValue();
-	return &colladaMesh.findGeometryNameForNode(node);
 }
 
 // Restrict the characters to a set of allowed characters in xs::NCName.
@@ -1379,12 +1347,6 @@ void CColladaMeshWriter::writeMaterialEffect(const irr::core::stringw& materialf
 					Writer->writeElement(L"wrap_t", false);
 					Writer->writeText(toString((video::E_TEXTURE_CLAMP)layer.TextureWrapV).c_str());
 					Writer->writeClosingTag(L"wrap_t");
-					Writer->writeLineBreak();
-
-		//			<wrap_p>WRAP</wrap_p>
-					Writer->writeElement(L"wrap_p", false);
-					Writer->writeText(toString((video::E_TEXTURE_CLAMP)layer.TextureWrapW).c_str());
-					Writer->writeClosingTag(L"wrap_p");
 					Writer->writeLineBreak();
 
 		//			<minfilter>LINEAR_MIPMAP_LINEAR</minfilter>
@@ -2250,18 +2212,6 @@ void CColladaMeshWriter::writeTranslateElement(const irr::core::vector3df& trans
 	txt += irr::core::stringw(translate.Z);
 	Writer->writeText(txt.c_str());
 	Writer->writeClosingTag(L"translate");
-	Writer->writeLineBreak();
-}
-
-void CColladaMeshWriter::writeLookAtElement(const irr::core::vector3df& eyePos, const irr::core::vector3df& targetPos, const irr::core::vector3df& upVector)
-{
-	Writer->writeElement(L"lookat", false);
-
-	wchar_t tmpbuf[255];
-	swprintf_irr(tmpbuf, 255, L"%f %f %f %f %f %f %f %f %f", eyePos.X, eyePos.Y, eyePos.Z, targetPos.X, targetPos.Y, targetPos.Z, upVector.X, upVector.Y, upVector.Z);
-	Writer->writeText(tmpbuf);
-
-	Writer->writeClosingTag(L"lookat");
 	Writer->writeLineBreak();
 }
 

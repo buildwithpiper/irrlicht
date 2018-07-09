@@ -625,7 +625,7 @@ void CBurningShader_Raster_Reference::setMaterial ( const SBurningShaderMaterial
 	ShaderParam.SetRenderState( BD3DRS_SPECULARMATERIALSOURCE, (m.ColorMaterial==ECM_SPECULAR)?BD3DMCS_COLOR1:BD3DMCS_MATERIAL);
 
 	// depth buffer enable and compare
-	ShaderParam.SetRenderState( BD3DRS_ZENABLE, (material.org.ZBuffer==video::ECFN_DISABLED) ? BD3DZB_FALSE : BD3DZB_USEW);
+	ShaderParam.SetRenderState( BD3DRS_ZENABLE, (material.org.ZBuffer==video::ECFN_NEVER) ? BD3DZB_FALSE : BD3DZB_USEW);
 	switch (material.org.ZBuffer)
 	{
 	case ECFN_NEVER:
@@ -721,7 +721,7 @@ REALINLINE void CBurningShader_Raster_Reference::scanline2()
 		line.t[i][0] += line.t[i][1] * subPixel;
 	}
 
-	pShader.dst = (tVideoSample*) ( (u8*) RenderTarget->getData() + ( line.y * RenderTarget->getPitch() ) + ( pShader.xStart << VIDEO_SAMPLE_GRANULARITY ) );
+	pShader.dst = (tVideoSample*) ( (u8*) RenderTarget->lock() + ( line.y * RenderTarget->getPitch() ) + ( pShader.xStart << VIDEO_SAMPLE_GRANULARITY ) );
 	pShader.z = (fp24*) ( (u8*) DepthBuffer->lock() + ( line.y * DepthBuffer->getPitch() ) + ( pShader.xStart << VIDEO_SAMPLE_GRANULARITY ) );
 
 	for ( pShader.i = 0; pShader.i <= pShader.dx; ++pShader.i )
@@ -795,6 +795,7 @@ REALINLINE void CBurningShader_Raster_Reference::scanline ()
 			pShader.i += 1;
 			if ( pShader.i > pShader.dx )
 				return;
+			
 		}
 	}
 
@@ -803,7 +804,7 @@ REALINLINE void CBurningShader_Raster_Reference::scanline ()
 	line.w[0] = a;
 	line.w[1] = b;
 
-	pShader.dst = (tVideoSample*) ( (u8*) RenderTarget->getData() + ( line.y * RenderTarget->getPitch() ) + ( pShader.xStart << VIDEO_SAMPLE_GRANULARITY ) );
+	pShader.dst = (tVideoSample*) ( (u8*) RenderTarget->lock() + ( line.y * RenderTarget->getPitch() ) + ( pShader.xStart << VIDEO_SAMPLE_GRANULARITY ) );
 
 	a = (f32) pShader.i + subPixel;
 
@@ -845,6 +846,7 @@ REALINLINE void CBurningShader_Raster_Reference::scanline ()
 	}
 
 }
+	
 
 
 void CBurningShader_Raster_Reference::drawTriangle ( const s4DVertex *a,const s4DVertex *b,const s4DVertex *c )
@@ -936,21 +938,21 @@ void CBurningShader_Raster_Reference::drawTriangle ( const s4DVertex *a,const s4
 
 		// correct to pixel center
 		scan.x[0] += scan.slopeX[0] * subPixel;
-		scan.x[1] += scan.slopeX[1] * subPixel;
+		scan.x[1] += scan.slopeX[1] * subPixel;		
 
 		scan.w[0] += scan.slopeW[0] * subPixel;
-		scan.w[1] += scan.slopeW[1] * subPixel;
+		scan.w[1] += scan.slopeW[1] * subPixel;		
 
 		for ( i = 0; i != ShaderParam.ColorUnits; ++i )
 		{
 			scan.c[i][0] += scan.slopeC[i][0] * subPixel;
-			scan.c[i][1] += scan.slopeC[i][1] * subPixel;
+			scan.c[i][1] += scan.slopeC[i][1] * subPixel;		
 		}
 
 		for ( i = 0; i != ShaderParam.TextureUnits; ++i )
 		{
 			scan.t[i][0] += scan.slopeT[i][0] * subPixel;
-			scan.t[i][1] += scan.slopeT[i][1] * subPixel;
+			scan.t[i][1] += scan.slopeT[i][1] * subPixel;		
 		}
 
 		// rasterize the edge scanlines
@@ -1051,21 +1053,21 @@ void CBurningShader_Raster_Reference::drawTriangle ( const s4DVertex *a,const s4
 
 		// correct to pixel center
 		scan.x[0] += scan.slopeX[0] * subPixel;
-		scan.x[1] += scan.slopeX[1] * subPixel;
+		scan.x[1] += scan.slopeX[1] * subPixel;		
 
 		scan.w[0] += scan.slopeW[0] * subPixel;
-		scan.w[1] += scan.slopeW[1] * subPixel;
+		scan.w[1] += scan.slopeW[1] * subPixel;		
 
 		for ( i = 0; i != ShaderParam.ColorUnits; ++i )
 		{
 			scan.c[i][0] += scan.slopeC[i][0] * subPixel;
-			scan.c[i][1] += scan.slopeC[i][1] * subPixel;
+			scan.c[i][1] += scan.slopeC[i][1] * subPixel;		
 		}
 
 		for ( i = 0; i != ShaderParam.TextureUnits; ++i )
 		{
 			scan.t[i][0] += scan.slopeT[i][0] * subPixel;
-			scan.t[i][1] += scan.slopeT[i][1] * subPixel;
+			scan.t[i][1] += scan.slopeT[i][1] * subPixel;		
 		}
 
 		// rasterize the edge scanlines

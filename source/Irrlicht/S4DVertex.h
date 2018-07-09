@@ -88,7 +88,7 @@ struct sCompressedVec4
 
 	void setColorf ( const video::SColorf & color )
 	{
-		argb = core::floor32 ( color.a * 255.f ) << 24 |
+		argb = 	core::floor32 ( color.a * 255.f ) << 24 |
 				core::floor32 ( color.r * 255.f ) << 16 |
 				core::floor32 ( color.g * 255.f ) << 8  |
 				core::floor32 ( color.b * 255.f );
@@ -390,7 +390,7 @@ struct sVec3
 
 inline void sCompressedVec4::setVec4 ( const sVec4 & v )
 {
-	argb = core::floor32 ( v.x * 255.f ) << 24 |
+	argb = 	core::floor32 ( v.x * 255.f ) << 24 |
 			core::floor32 ( v.y * 255.f ) << 16 |
 			core::floor32 ( v.z * 255.f ) << 8  |
 			core::floor32 ( v.w * 255.f );
@@ -644,9 +644,9 @@ inline void getTexel_plain2 (	tFixPoint &r, tFixPoint &g, tFixPoint &b,
 							const sVec4 &v
 							)
 {
-	r = tofix(v.y, FIX_POINT_F32_MUL);
-	g = tofix(v.z, FIX_POINT_F32_MUL);
-	b = tofix(v.w, FIX_POINT_F32_MUL);
+	r = tofix ( v.y );
+	g = tofix ( v.z );
+	b = tofix ( v.w );
 }
 
 /*
@@ -656,7 +656,7 @@ inline void getSample_color (	tFixPoint &a, tFixPoint &r, tFixPoint &g, tFixPoin
 							const sVec4 &v
 							)
 {
-	a = tofix(v.x, FIX_POINT_F32_MUL);
+	a = tofix ( v.x );
 	r = tofix ( v.y, COLOR_MAX * FIX_POINT_F32_MUL);
 	g = tofix ( v.z, COLOR_MAX * FIX_POINT_F32_MUL);
 	b = tofix ( v.w, COLOR_MAX * FIX_POINT_F32_MUL);

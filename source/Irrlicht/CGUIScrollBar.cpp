@@ -166,6 +166,7 @@ bool CGUIScrollBar::OnEvent(const SEvent& event)
 					DraggedBySlider = SliderRect.isPointInside(p);
 					TrayClick = !DraggedBySlider;
 					DesiredPos = getPosFromMousePos(p);
+					Environment->setFocus ( this );
 					return true;
 				}
 				break;
@@ -348,22 +349,20 @@ void CGUIScrollBar::setPos(s32 pos)
 {
 	Pos = core::s32_clamp ( pos, Min, Max );
 
-	if ( core::isnotzero ( range() ) )
+	if (Horizontal)
 	{
-		if (Horizontal)
-		{
-			f32 f = (RelativeRect.getWidth() - ((f32)RelativeRect.getHeight()*3.0f)) / range();
-			DrawPos = (s32)( ( ( Pos - Min ) * f) + ((f32)RelativeRect.getHeight() * 0.5f));
-			DrawHeight = RelativeRect.getHeight();
-		}
-		else
-		{
-			f32 f = (RelativeRect.getHeight() - ((f32)RelativeRect.getWidth()*3.0f)) / range();
-
-			DrawPos = (s32)( ( ( Pos - Min ) * f) + ((f32)RelativeRect.getWidth() * 0.5f));
-			DrawHeight = RelativeRect.getWidth();
-		}
+		f32 f = (RelativeRect.getWidth() - ((f32)RelativeRect.getHeight()*3.0f)) / range();
+		DrawPos = (s32)( ( ( Pos - Min ) * f) + ((f32)RelativeRect.getHeight() * 0.5f));
+		DrawHeight = RelativeRect.getHeight();
 	}
+	else
+	{
+		f32 f = (RelativeRect.getHeight() - ((f32)RelativeRect.getWidth()*3.0f)) / range();
+
+		DrawPos = (s32)( ( ( Pos - Min ) * f) + ((f32)RelativeRect.getWidth() * 0.5f));
+		DrawHeight = RelativeRect.getWidth();
+	}
+
 }
 
 

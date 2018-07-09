@@ -83,26 +83,13 @@ namespace scene
 		//! recalculates the bounding box
 		void recalculateBoundingBox()
 		{
-			bool hasMeshBufferBBox = false;
-			for (u32 i=0; i<MeshBuffers.size(); ++i)
+			if (MeshBuffers.size())
 			{
-				const core::aabbox3df& bb = MeshBuffers[i]->getBoundingBox();
-				if ( !bb.isEmpty() )
-				{
-					if ( !hasMeshBufferBBox )
-					{
-						hasMeshBufferBBox = true;
-						BoundingBox = bb;
-					}
-					else
-					{
-						BoundingBox.addInternalBox(bb);
-					}
-
-				}
+				BoundingBox = MeshBuffers[0]->getBoundingBox();
+				for (u32 i=1; i<MeshBuffers.size(); ++i)
+					BoundingBox.addInternalBox(MeshBuffers[i]->getBoundingBox());
 			}
-
-			if ( !hasMeshBufferBBox )
+			else
 				BoundingBox.reset(0.0f, 0.0f, 0.0f);
 		}
 

@@ -103,14 +103,14 @@ class line3d
 			return start + v;
 		}
 
-		//! Check if the line intersects with a sphere
-		/** \param sorigin: Origin of the sphere.
+		//! Check if the line intersects with a shpere
+		/** \param sorigin: Origin of the shpere.
 		\param sradius: Radius of the sphere.
 		\param outdistance: The distance to the first intersection point.
 		\return True if there is an intersection.
 		If there is one, the distance to the first intersection point
 		is stored in outdistance. */
-		bool getIntersectionWithSphere(const vector3d<T>& sorigin, T sradius, f64& outdistance) const
+		bool getIntersectionWithSphere(vector3d<T> sorigin, T sradius, f64& outdistance) const
 		{
 			const vector3d<T> q = sorigin - start;
 			T c = q.getLength();

@@ -41,49 +41,56 @@ class map
 				p->setParent(this);
 		}
 
-		void setParent(RBTree* p) { Parent=p; }
+		void setParent(RBTree* p)		{ Parent=p; }
 
-		void setValue(const ValueTypeRB& v) { Value = v; }
+		void setValue(const ValueTypeRB& v)	{ Value = v; }
 
-		void setRed() { IsRed = true; }
-		void setBlack() { IsRed = false; }
+		void setRed()			{ IsRed = true; }
+		void setBlack()			{ IsRed = false; }
 
-		RBTree* getLeftChild() const { return LeftChild; }
-		RBTree* getRightChild() const { return RightChild; }
-		RBTree* getParent() const { return Parent; }
+		RBTree* getLeftChild() const	{ return LeftChild; }
+		RBTree* getRightChild() const	{ return RightChild; }
+		RBTree* getParent() const		{ return Parent; }
 
 		const ValueTypeRB& getValue() const
 		{
+			_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 			return Value;
 		}
 
 		ValueTypeRB& getValue()
 		{
+			_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 			return Value;
 		}
 
 		const KeyTypeRB& getKey() const
 		{
+			_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 			return Key;
 		}
 
 		bool isRoot() const
 		{
+			_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 			return Parent==0;
 		}
 
 		bool isLeftChild() const
 		{
+			_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 			return (Parent != 0) && (Parent->getLeftChild()==this);
 		}
 
 		bool isRightChild() const
 		{
+			_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 			return (Parent!=0) && (Parent->getRightChild()==this);
 		}
 
 		bool isLeaf() const
 		{
+			_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 			return (LeftChild==0) && (RightChild==0);
 		}
 
@@ -98,24 +105,26 @@ class map
 
 		bool isRed() const
 		{
+			_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 			return IsRed;
 		}
 
 		bool isBlack() const
 		{
+			_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 			return !IsRed;
 		}
 
 	private:
 		RBTree();
 
-		RBTree* LeftChild;
-		RBTree* RightChild;
+		RBTree*		LeftChild;
+		RBTree*		RightChild;
 
-		RBTree* Parent;
+		RBTree*		Parent;
 
-		KeyTypeRB Key;
-		ValueTypeRB Value;
+		KeyTypeRB	Key;
+		ValueTypeRB	Value;
 
 		bool IsRed;
 	}; // RBTree
@@ -123,7 +132,7 @@ class map
 	public:
 
 	typedef RBTree<KeyType,ValueType> Node;
-	// We need the forward declaration for the friend declaration
+	// We need the forwad declaration for the friend declaration
 	class ConstIterator;
 
 	//! Normal Iterator
@@ -153,6 +162,7 @@ class map
 
 		bool atEnd() const
 		{
+			_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 			return Cur==0;
 		}
 
@@ -227,9 +237,9 @@ class map
 			else
 			{
 				// Current node neither is left child nor has a right child.
-				// I.e. it is either right child or root
+				// Ie it is either right child or root
 				// The next higher node is the parent of the first non-right
-				// child (i.e. either a left child or the root) up in the
+				// child (ie either a left child or the root) up in the
 				// hierarchy. Root's parent is 0.
 				while(Cur->isRightChild())
 					Cur = Cur->getParent();
@@ -258,9 +268,9 @@ class map
 			else
 			{
 				// Current node neither is right child nor has a left child.
-				// It is either left child or root
+				// Ie it is either left child or root
 				// The next higher node is the parent of the first non-left
-				// child (i.e. either a right child or the root) up in the
+				// child (ie either a right child or the root) up in the
 				// hierarchy. Root's parent is 0.
 
 				while(Cur->isLeftChild())
@@ -301,6 +311,7 @@ class map
 
 		bool atEnd() const
 		{
+			_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 			return Cur==0;
 		}
 
@@ -375,9 +386,9 @@ class map
 			else
 			{
 				// Current node neither is left child nor has a right child.
-				// It is either right child or root
+				// Ie it is either right child or root
 				// The next higher node is the parent of the first non-right
-				// child (i.e. either a left child or the root) up in the
+				// child (ie either a left child or the root) up in the
 				// hierarchy. Root's parent is 0.
 				while(Cur->isRightChild())
 					Cur = Cur->getParent();
@@ -406,9 +417,9 @@ class map
 			else
 			{
 				// Current node neither is right child nor has a left child.
-				// It is either left child or root
+				// Ie it is either left child or root
 				// The next higher node is the parent of the first non-left
-				// child (i.e. either a right child or the root) up in the
+				// child (ie either a right child or the root) up in the
 				// hierarchy. Root's parent is 0.
 
 				while(Cur->isLeftChild())
@@ -431,7 +442,7 @@ class map
 	{
 	public:
 
-	ParentFirstIterator() : Root(0), Cur(0) {}
+	ParentFirstIterator() : Root(0), Cur(0)	{}
 
 	explicit ParentFirstIterator(Node* root) : Root(root), Cur(0)
 	{
@@ -445,6 +456,7 @@ class map
 
 	bool atEnd() const
 	{
+		_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 		return Cur==0;
 	}
 
@@ -497,7 +509,7 @@ class map
 		}
 		else
 		{
-			// No children? Move up in the hierarchy until
+			// No children? Move up in the hierarcy until
 			// we either reach 0 (and are finished) or
 			// find a right uncle.
 			while (Cur!=0)
@@ -544,6 +556,7 @@ class map
 
 		bool atEnd() const
 		{
+			_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 			return Cur==0;
 		}
 
@@ -641,6 +654,7 @@ class map
 			// Not found
 			_IRR_DEBUG_BREAK_IF(node==0) // access violation
 
+			_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 			return node->getValue();
 		}
 
@@ -679,6 +693,7 @@ class map
 		if (!insert(newNode))
 		{
 			delete newNode;
+			_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 			return false;
 		}
 
@@ -817,6 +832,7 @@ class map
 	{
 		if (p == 0)
 		{
+			_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 			return false;
 		}
 
@@ -872,6 +888,7 @@ class map
 	//! \return Returns true if empty, false if not
 	bool empty() const
 	{
+		_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 		return Root == 0;
 	}
 
@@ -921,7 +938,7 @@ class map
 	/** Afterwards this object will contain the content of the other object and the other
 	object will contain the content of this object. Iterators will afterwards be valid for
 	the swapped object.
-	\param other Swap content with this object */
+	\param other Swap content with this object	*/
 	void swap(map<KeyType, ValueType>& other)
 	{
 		core::swap(Root, other.Root);
@@ -1056,6 +1073,7 @@ class map
 				++Size;
 		}
 
+		_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 		return result;
 	}
 

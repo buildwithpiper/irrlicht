@@ -183,20 +183,21 @@ REALINLINE void CTRTextureLightMap2_Add::scanline_bilinear ()
 #endif
 #endif
 
-	dst = (tVideoSample*)RenderTarget->getData() + ( line.y * RenderTarget->getDimension().Width ) + xStart;
+	dst = (tVideoSample*)RenderTarget->lock() + ( line.y * RenderTarget->getDimension().Width ) + xStart;
 
 #ifdef USE_ZBUFFER
 	z = (fp24*) DepthBuffer->lock() + ( line.y * RenderTarget->getDimension().Width ) + xStart;
 #endif
 
 
+
+
 #ifdef BURNINGVIDEO_RENDERER_FAST
-	f32 inversew = FIX_POINT_F32_MUL;
 	u32 dIndex = ( line.y & 3 ) << 2;
 
 
 #else
-	//
+	// 
 	tFixPoint r0, g0, b0;
 	tFixPoint r1, g1, b1;
 #endif
@@ -222,16 +223,28 @@ REALINLINE void CTRTextureLightMap2_Add::scanline_bilinear ()
 #ifdef BURNINGVIDEO_RENDERER_FAST
 
 #ifdef INVERSE_W
-			inversew = fix_inverse32 ( line.w[0] );
-#endif
+
+			const f32 inversew = fix_inverse32 ( line.w[0] );
+
 			const tFixPointu d = dithermask [ dIndex | ( i ) & 3 ];
 
 			dst[i] = PixelAdd32 (
-					getTexel_plain ( &IT[0],	d + tofix ( line.t[0][0].x,inversew),
+					getTexel_plain ( &IT[0],	d + tofix ( line.t[0][0].x,inversew), 
 												d + tofix ( line.t[0][0].y,inversew) ),
-					getTexel_plain ( &IT[1],	d + tofix ( line.t[1][0].x,inversew),
+					getTexel_plain ( &IT[1],	d + tofix ( line.t[1][0].x,inversew), 
 												d + tofix ( line.t[1][0].y,inversew) )
 							);
+#else
+			const tFixPointu d = dithermask [ dIndex | ( i ) & 3 ];
+
+			dst[i] = PixelAdd32 (
+					getTexel_plain ( &IT[0],	d + tofix ( line.t[0][0].x), 
+												d + tofix ( line.t[0][0].y) ),
+					getTexel_plain ( &IT[1],	d + tofix ( line.t[1][0].x), 
+												d + tofix ( line.t[1][0].y) )
+							);
+
+#endif
 
 #else
 			const f32 inversew = fix_inverse32 ( line.w[0] );
@@ -373,31 +386,31 @@ void CTRTextureLightMap2_Add::drawTriangle ( const s4DVertex *a,const s4DVertex 
 
 		// correct to pixel center
 		scan.x[0] += scan.slopeX[0] * subPixel;
-		scan.x[1] += scan.slopeX[1] * subPixel;
+		scan.x[1] += scan.slopeX[1] * subPixel;		
 
 #ifdef IPOL_Z
 		scan.z[0] += scan.slopeZ[0] * subPixel;
-		scan.z[1] += scan.slopeZ[1] * subPixel;
+		scan.z[1] += scan.slopeZ[1] * subPixel;		
 #endif
 
 #ifdef IPOL_W
 		scan.w[0] += scan.slopeW[0] * subPixel;
-		scan.w[1] += scan.slopeW[1] * subPixel;
+		scan.w[1] += scan.slopeW[1] * subPixel;		
 #endif
 
 #ifdef IPOL_C0
 		scan.c[0] += scan.slopeC[0] * subPixel;
-		scan.c[1] += scan.slopeC[1] * subPixel;
+		scan.c[1] += scan.slopeC[1] * subPixel;		
 #endif
 
 #ifdef IPOL_T0
 		scan.t[0][0] += scan.slopeT[0][0] * subPixel;
-		scan.t[0][1] += scan.slopeT[0][1] * subPixel;
+		scan.t[0][1] += scan.slopeT[0][1] * subPixel;		
 #endif
 
 #ifdef IPOL_T1
 		scan.t[1][0] += scan.slopeT[1][0] * subPixel;
-		scan.t[1][1] += scan.slopeT[1][1] * subPixel;
+		scan.t[1][1] += scan.slopeT[1][1] * subPixel;		
 #endif
 
 #endif
@@ -533,31 +546,31 @@ void CTRTextureLightMap2_Add::drawTriangle ( const s4DVertex *a,const s4DVertex 
 
 		// correct to pixel center
 		scan.x[0] += scan.slopeX[0] * subPixel;
-		scan.x[1] += scan.slopeX[1] * subPixel;
+		scan.x[1] += scan.slopeX[1] * subPixel;		
 
 #ifdef IPOL_Z
 		scan.z[0] += scan.slopeZ[0] * subPixel;
-		scan.z[1] += scan.slopeZ[1] * subPixel;
+		scan.z[1] += scan.slopeZ[1] * subPixel;		
 #endif
 
 #ifdef IPOL_W
 		scan.w[0] += scan.slopeW[0] * subPixel;
-		scan.w[1] += scan.slopeW[1] * subPixel;
+		scan.w[1] += scan.slopeW[1] * subPixel;		
 #endif
 
 #ifdef IPOL_C0
 		scan.c[0] += scan.slopeC[0] * subPixel;
-		scan.c[1] += scan.slopeC[1] * subPixel;
+		scan.c[1] += scan.slopeC[1] * subPixel;		
 #endif
 
 #ifdef IPOL_T0
 		scan.t[0][0] += scan.slopeT[0][0] * subPixel;
-		scan.t[0][1] += scan.slopeT[0][1] * subPixel;
+		scan.t[0][1] += scan.slopeT[0][1] * subPixel;		
 #endif
 
 #ifdef IPOL_T1
 		scan.t[1][0] += scan.slopeT[1][0] * subPixel;
-		scan.t[1][1] += scan.slopeT[1][1] * subPixel;
+		scan.t[1][1] += scan.slopeT[1][1] * subPixel;		
 #endif
 
 #endif

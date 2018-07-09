@@ -139,7 +139,7 @@ void CSoftwareDriver::selectRightTriangleRenderer()
 					renderer = ETR_TEXTURE_GOURAUD_ADD;
 				}
 				else
-				if ((Material.ZBuffer==ECFN_DISABLED) && !Material.ZWriteEnable)
+				if ((Material.ZBuffer==ECFN_NEVER) && !Material.ZWriteEnable)
 					renderer = ETR_TEXTURE_GOURAUD_NOZ;
 				else
 				{
@@ -171,16 +171,6 @@ bool CSoftwareDriver::queryFeature(E_VIDEO_DRIVER_FEATURE feature) const
 	default:
 		return false;
 	};
-}
-
-
-//! Create render target.
-IRenderTarget* CSoftwareDriver::addRenderTarget()
-{
-	CSoftwareRenderTarget* renderTarget = new CSoftwareRenderTarget(this);
-	RenderTargets.push_back(renderTarget);
-
-	return renderTarget;
 }
 
 
@@ -227,17 +217,26 @@ void CSoftwareDriver::setMaterial(const SMaterial& material)
 	}
 }
 
-bool CSoftwareDriver::beginScene(u16 clearFlag, SColor clearColor, f32 clearDepth, u8 clearStencil, const SExposedVideoData& videoData, core::rect<s32>* sourceRect)
+
+//! clears the zbuffer
+bool CSoftwareDriver::beginScene(bool backBuffer, bool zBuffer, SColor color,
+		const SExposedVideoData& videoData, core::rect<s32>* sourceRect)
 {
-	CNullDriver::beginScene(clearFlag, clearColor, clearDepth, clearStencil, videoData, sourceRect);
+	CNullDriver::beginScene(backBuffer, zBuffer, color, videoData, sourceRect);
 	WindowId=videoData.D3D9.HWnd;
 	SceneSourceRect = sourceRect;
 
-	clearBuffers(clearFlag, clearColor, clearDepth, clearStencil);
+	if (backBuffer && BackBuffer)
+		BackBuffer->fill(color);
+
+	if (ZBuffer && zBuffer)
+		ZBuffer->clear();
 
 	return true;
 }
 
+
+//! presents the rendered scene on the screen, returns false if failed
 bool CSoftwareDriver::endScene()
 {
 	CNullDriver::endScene();
@@ -245,26 +244,29 @@ bool CSoftwareDriver::endScene()
 	return Presenter->present(BackBuffer, WindowId, SceneSourceRect);
 }
 
-ITexture* CSoftwareDriver::createDeviceDependentTexture(const io::path& name, IImage* image)
-{
-	CSoftwareTexture* texture = new CSoftwareTexture(image, name, false);
 
-	return texture;
+//! returns a device dependent texture from a software surface (IImage)
+//! THIS METHOD HAS TO BE OVERRIDDEN BY DERIVED DRIVERS WITH OWN TEXTURES
+ITexture* CSoftwareDriver::createDeviceDependentTexture(IImage* surface, const io::path& name, void* mipmapData)
+{
+	return new CSoftwareTexture(surface, name, false, mipmapData);
 }
 
-bool CSoftwareDriver::setRenderTargetEx(IRenderTarget* target, u16 clearFlag, SColor clearColor, f32 clearDepth, u8 clearStencil)
+
+//! sets a render target
+bool CSoftwareDriver::setRenderTarget(video::ITexture* texture, bool clearBackBuffer,
+								bool clearZBuffer, SColor color)
 {
-	if (target && target->getDriverType() != EDT_SOFTWARE)
+	if (texture && texture->getDriverType() != EDT_SOFTWARE)
 	{
-		os::Printer::log("Fatal Error: Tried to set a render target not owned by this driver.", ELL_ERROR);
+		os::Printer::log("Fatal Error: Tried to set a texture not owned by this driver.", ELL_ERROR);
 		return false;
 	}
 
 	if (RenderTargetTexture)
 		RenderTargetTexture->drop();
 
-	CSoftwareRenderTarget* renderTarget = static_cast<CSoftwareRenderTarget*>(target);
-	RenderTargetTexture = (renderTarget) ? renderTarget->getTexture() : 0;
+	RenderTargetTexture = texture;
 
 	if (RenderTargetTexture)
 	{
@@ -276,7 +278,14 @@ bool CSoftwareDriver::setRenderTargetEx(IRenderTarget* target, u16 clearFlag, SC
 		setRenderTarget(BackBuffer);
 	}
 
-	clearBuffers(clearFlag, clearColor, clearDepth, clearStencil);
+	if (RenderTargetSurface && (clearBackBuffer || clearZBuffer))
+	{
+		if (clearZBuffer)
+			ZBuffer->clear();
+
+		if (clearBackBuffer)
+			RenderTargetSurface->fill(color);
+	}
 
 	return true;
 }
@@ -903,12 +912,11 @@ ITexture* CSoftwareDriver::addRenderTargetTexture(const core::dimension2d<u32>& 
 	return tex;
 }
 
-void CSoftwareDriver::clearBuffers(u16 flag, SColor color, f32 depth, u8 stencil)
-{
-	if ((flag & ECBF_COLOR) && RenderTargetSurface)
-		RenderTargetSurface->fill(color);
 
-	if ((flag & ECBF_DEPTH) && ZBuffer)
+//! Clears the ZBuffer.
+void CSoftwareDriver::clearZBuffer()
+{
+	if (ZBuffer)
 		ZBuffer->clear();
 }
 
@@ -937,12 +945,6 @@ u32 CSoftwareDriver::getMaximalPrimitiveCount() const
 {
 	return 0x00800000;
 }
-
-bool CSoftwareDriver::queryTextureFormat(ECOLOR_FORMAT format) const
-{
-	return format == ECF_A1R5G5B5;
-}
-
 
 } // end namespace video
 } // end namespace irr

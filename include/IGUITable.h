@@ -6,14 +6,14 @@
 #define __I_GUI_TABLE_H_INCLUDED__
 
 #include "IGUIElement.h"
+#include "irrTypes.h"
 #include "SColor.h"
+#include "IGUISkin.h"
 
 namespace irr
 {
 namespace gui
 {
-	class IGUIFont;
-	class IGUIScrollBar;
 
 	//! modes for ordering used when a column header is clicked
 	enum EGUI_COLUMN_ORDERING
@@ -94,7 +94,7 @@ namespace gui
 			: IGUIElement(EGUIET_TABLE, environment, parent, id, rectangle) {}
 
 		//! Adds a column
-		/** If columnIndex is outside the current range, do push new column at the end */
+		/** If columnIndex is outside the current range, do push new colum at the end */
 		virtual void addColumn(const wchar_t* caption, s32 columnIndex=-1) = 0;
 
 		//! remove a column from the table
@@ -104,9 +104,9 @@ namespace gui
 		virtual s32 getColumnCount() const = 0;
 
 		//! Makes a column active. This will trigger an ordering process.
-		/** \param idx: The id of the column to make active or a negative number to make non active.
+		/** \param idx: The id of the column to make active.
 		\param doOrder: Do also the ordering which depending on mode for active column
-		\return True when the column could be set active (aka - it did exist). */
+		\return True if successful. */
 		virtual bool setActiveColumn(s32 idx, bool doOrder=false) = 0;
 
 		//! Returns which header is currently active
@@ -124,7 +124,7 @@ namespace gui
 		//! columns can be resized by drag 'n drop
 		virtual void setResizableColumns(bool resizable) = 0;
 
-		//! can columns be resized by drag 'n drop?
+		//! can columns be resized by dran 'n drop?
 		virtual bool hasResizableColumns() const = 0;
 
 		//! This tells the table control which ordering mode should be used when a column header is clicked.
@@ -135,7 +135,7 @@ namespace gui
 		//! Returns which row is currently selected
 		virtual s32 getSelected() const = 0;
 
-		//! set which row is currently selected
+		//! set wich row is currently selected
 		virtual void setSelected( s32 index ) = 0;
 
 		//! Get amount of rows in the tabcontrol
@@ -190,41 +190,11 @@ namespace gui
 		//! clears the table, deletes all items in the table
 		virtual void clear() = 0;
 
-		//! Set flags, as defined in ::EGUI_TABLE_DRAW_FLAGS, which influence the layout
+		//! Set flags, as defined in EGUI_TABLE_DRAW_FLAGS, which influence the layout
 		virtual void setDrawFlags(s32 flags) = 0;
 
-		//! Get the flags, as defined in ::EGUI_TABLE_DRAW_FLAGS, which influence the layout
+		//! Get the flags, as defined in EGUI_TABLE_DRAW_FLAGS, which influence the layout
 		virtual s32 getDrawFlags() const = 0;
-
-		//! Sets another skin independent font.
-		/** If this is set to zero, the button uses the font of the skin.
-		\param font: New font to set. */
-		virtual void setOverrideFont(IGUIFont* font=0) = 0;
-
-		//! Gets the override font (if any)
-		/** \return The override font (may be 0) */
-		virtual IGUIFont* getOverrideFont(void) const = 0;
-
-		//! Get the font which is used right now for drawing
-		/** Currently this is the override font when one is set and the
-		font of the active skin otherwise */
-		virtual IGUIFont* getActiveFont() const = 0;
-
-		//! Get the height of items/rows
-		virtual s32 getItemHeight() const = 0;
-
-		//! Access the vertical scrollbar
-		virtual IGUIScrollBar* getVerticalScrollBar() const = 0;
-
-		//! Access the horizontal scrollbar
-		virtual IGUIScrollBar* getHorizontalScrollBar() const = 0;
-
-		//! Sets whether to draw the background.
-		virtual void setDrawBackground(bool draw) = 0;
-
-		//! Checks if background drawing is enabled
-		/** \return true if background drawing is enabled, false otherwise */
-		virtual bool isDrawBackgroundEnabled() const = 0;
 	};
 
 

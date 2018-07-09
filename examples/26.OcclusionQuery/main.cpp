@@ -1,6 +1,6 @@
 /** Example 026 OcclusionQuery
 
-This tutorial shows how to speed up rendering by use of the
+This Tutorial shows how to speed up rendering by use of the
 OcclusionQuery feature. The usual rendering tries to avoid rendering of
 scene nodes by culling those nodes which are outside the visible area, the
 view frustum. However, this technique does not cope with occluded objects
@@ -42,7 +42,6 @@ of the objects and camera.
 
 #include <irrlicht.h>
 #include "driverChoice.h"
-#include "exampleHelper.h"
 
 using namespace irr;
 
@@ -103,8 +102,6 @@ int main()
 	video::IVideoDriver* driver = device->getVideoDriver();
 	scene::ISceneManager* smgr = device->getSceneManager();
 
-	const io::path mediaPath = getExampleMediaPath();
-
 	smgr->getGUIEnvironment()->addStaticText(L"Press Space to hide occluder.", core::recti(10,10, 200,50));
 
 	/*
@@ -114,7 +111,7 @@ int main()
 	if (node)
 	{
 		node->setPosition(core::vector3df(0,0,60));
-		node->setMaterialTexture(0, driver->getTexture(mediaPath + "wall.bmp"));
+		node->setMaterialTexture(0, driver->getTexture("../../media/wall.bmp"));
 		node->setMaterialFlag(video::EMF_LIGHTING, false);
 	}
 
@@ -127,7 +124,7 @@ int main()
 
 	if (plane)
 	{
-		plane->setMaterialTexture(0, driver->getTexture(mediaPath + "t351sml.jpg"));
+		plane->setMaterialTexture(0, driver->getTexture("../../media/t351sml.jpg"));
 		plane->setMaterialFlag(video::EMF_LIGHTING, false);
 		plane->setMaterialFlag(video::EMF_BACK_FACE_CULLING, true);
 	}
@@ -157,7 +154,7 @@ int main()
 	{
 		plane->setVisible(!receiver.IsKeyDown(irr::KEY_SPACE));
 
-		driver->beginScene(video::ECBF_COLOR | video::ECBF_DEPTH, video::SColor(255,113,113,133));
+		driver->beginScene(true, true, video::SColor(255,113,113,133));
 		/*
 		First, we draw the scene, possibly without the occluded element. This is necessary
 		because we need the occluder to be drawn first. You can also use several scene

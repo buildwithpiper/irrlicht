@@ -184,14 +184,16 @@ void CTRTextureDetailMap2::scanline_bilinear ()
 #endif
 #endif
 
-	dst = (tVideoSample*)RenderTarget->getData() + ( line.y * RenderTarget->getDimension().Width ) + xStart;
+	dst = (tVideoSample*)RenderTarget->lock() + ( line.y * RenderTarget->getDimension().Width ) + xStart;
 
 #ifdef USE_ZBUFFER
 	z = (fp24*) DepthBuffer->lock() + ( line.y * RenderTarget->getDimension().Width ) + xStart;
 #endif
 
 
-	f32 inversew = FIX_POINT_F32_MUL;
+#ifdef INVERSE_W
+	f32 inversew;
+#endif
 
 	tFixPoint tx0, tx1;
 	tFixPoint ty0, ty1;
@@ -213,12 +215,18 @@ void CTRTextureDetailMap2::scanline_bilinear ()
 		{
 #ifdef INVERSE_W
 			inversew = fix_inverse32 ( line.w[0] );
-#endif
+
 			tx0 = tofix ( line.t[0][0].x,inversew);
 			ty0 = tofix ( line.t[0][0].y,inversew);
 			tx1 = tofix ( line.t[1][0].x,inversew);
 			ty1 = tofix ( line.t[1][0].y,inversew);
 
+#else
+			tx0 = tofix ( line.t[0][0].x );
+			ty0 = tofix ( line.t[0][0].y );
+			tx1 = tofix ( line.t[1][0].x );
+			ty1 = tofix ( line.t[1][0].y );
+#endif
 			getSample_texture ( r0, g0, b0, &IT[0], tx0,ty0 );
 			getSample_texture ( r1, g1, b1, &IT[1], tx1,ty1 );
 
@@ -368,31 +376,31 @@ void CTRTextureDetailMap2::drawTriangle ( const s4DVertex *a,const s4DVertex *b,
 
 		// correct to pixel center
 		scan.x[0] += scan.slopeX[0] * subPixel;
-		scan.x[1] += scan.slopeX[1] * subPixel;
+		scan.x[1] += scan.slopeX[1] * subPixel;		
 
 #ifdef IPOL_Z
 		scan.z[0] += scan.slopeZ[0] * subPixel;
-		scan.z[1] += scan.slopeZ[1] * subPixel;
+		scan.z[1] += scan.slopeZ[1] * subPixel;		
 #endif
 
 #ifdef IPOL_W
 		scan.w[0] += scan.slopeW[0] * subPixel;
-		scan.w[1] += scan.slopeW[1] * subPixel;
+		scan.w[1] += scan.slopeW[1] * subPixel;		
 #endif
 
 #ifdef IPOL_C0
 		scan.c[0][0] += scan.slopeC[0][0] * subPixel;
-		scan.c[0][1] += scan.slopeC[0][1] * subPixel;
+		scan.c[0][1] += scan.slopeC[0][1] * subPixel;		
 #endif
 
 #ifdef IPOL_T0
 		scan.t[0][0] += scan.slopeT[0][0] * subPixel;
-		scan.t[0][1] += scan.slopeT[0][1] * subPixel;
+		scan.t[0][1] += scan.slopeT[0][1] * subPixel;		
 #endif
 
 #ifdef IPOL_T1
 		scan.t[1][0] += scan.slopeT[1][0] * subPixel;
-		scan.t[1][1] += scan.slopeT[1][1] * subPixel;
+		scan.t[1][1] += scan.slopeT[1][1] * subPixel;		
 #endif
 
 #endif
@@ -528,31 +536,31 @@ void CTRTextureDetailMap2::drawTriangle ( const s4DVertex *a,const s4DVertex *b,
 
 		// correct to pixel center
 		scan.x[0] += scan.slopeX[0] * subPixel;
-		scan.x[1] += scan.slopeX[1] * subPixel;
+		scan.x[1] += scan.slopeX[1] * subPixel;		
 
 #ifdef IPOL_Z
 		scan.z[0] += scan.slopeZ[0] * subPixel;
-		scan.z[1] += scan.slopeZ[1] * subPixel;
+		scan.z[1] += scan.slopeZ[1] * subPixel;		
 #endif
 
 #ifdef IPOL_W
 		scan.w[0] += scan.slopeW[0] * subPixel;
-		scan.w[1] += scan.slopeW[1] * subPixel;
+		scan.w[1] += scan.slopeW[1] * subPixel;		
 #endif
 
 #ifdef IPOL_C0
 		scan.c[0][0] += scan.slopeC[0][0] * subPixel;
-		scan.c[0][1] += scan.slopeC[0][1] * subPixel;
+		scan.c[0][1] += scan.slopeC[0][1] * subPixel;		
 #endif
 
 #ifdef IPOL_T0
 		scan.t[0][0] += scan.slopeT[0][0] * subPixel;
-		scan.t[0][1] += scan.slopeT[0][1] * subPixel;
+		scan.t[0][1] += scan.slopeT[0][1] * subPixel;		
 #endif
 
 #ifdef IPOL_T1
 		scan.t[1][0] += scan.slopeT[1][0] * subPixel;
-		scan.t[1][1] += scan.slopeT[1][1] * subPixel;
+		scan.t[1][1] += scan.slopeT[1][1] * subPixel;		
 #endif
 
 #endif

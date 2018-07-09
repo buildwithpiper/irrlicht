@@ -46,7 +46,7 @@ IFileArchive* CArchiveLoaderWAD::createArchive(const io::path& filename, bool ig
 		archive = createArchive ( file, ignoreCase, ignorePaths );
 		file->drop ();
 	}
-
+	
 	return archive;
 }
 
@@ -115,7 +115,7 @@ CWADReader::CWADReader(IReadFile* file, bool ignoreCase, bool ignorePaths)
 	{
 		SWADFileEntry &e = FileList[i];
 		char buf[128];
-		snprintf_irr ( buf, 128, "c:\\h2\\%s", e.wadFileName.c_str() );
+		snprintf ( buf, 128, "c:\\h2\\%s", e.wadFileName.c_str() );
 
 		createDir ( buf );
 		FILE * f = fopen ( buf, "wb" );
@@ -143,7 +143,7 @@ CWADReader::~CWADReader()
 
 //! return the id of the file Archive
 const io::path& CWADReader::getArchiveName () const
-{
+{ 
 	return Base;
 }
 
@@ -200,7 +200,7 @@ bool CWADReader::scanLocalHeader()
 					save.wadFileName += ".wal2";
 					break;
 				default:
-					snprintf_irr ( buf, 16, ".%02d", entry.type );
+					snprintf ( buf, 16, ".%02d", entry.type );
 					save.wadFileName += buf;
 					break;
 			}
@@ -217,7 +217,7 @@ bool CWADReader::scanLocalHeader()
 				case WAD_TYP_QPIC: save.wadFileName += ".qpic"; break;
 				case WAD_TYP_FONT: save.wadFileName += ".font"; break;
 				default:
-					snprintf_irr ( buf, 16, ".%02d", entry.type );
+					snprintf ( buf, 16, ".%02d", entry.type );
 					save.wadFileName += buf;
 					break;
 			}

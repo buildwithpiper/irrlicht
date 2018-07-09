@@ -27,7 +27,6 @@
 #include "IGUIToolbar.h"
 #include "IGUIWindow.h"
 #include "IGUITreeView.h"
-#include "IGUIProfiler.h"
 
 namespace irr
 {
@@ -97,8 +96,6 @@ IGUIElement* CDefaultGUIElementFactory::addGUIElement(EGUI_ELEMENT_TYPE type, IG
 			return Environment->addSpinBox(L"0.0", core::rect<s32>(0,0,100,100), true, parent);
 		case EGUIET_TREE_VIEW:
 			return Environment->addTreeView(core::rect<s32>(0,0,100,100),parent);
-		case EGUIET_PROFILER:
-			return Environment->addProfilerDisplay(core::rect<s32>(0,0,100,100), parent);
 		default:
  			return 0;
 	}
@@ -119,7 +116,7 @@ s32 CDefaultGUIElementFactory::getCreatableGUIElementTypeCount() const
 }
 
 
-//! Returns the type of a creatable element type.
+//! Returns the type of a createable element type.
 EGUI_ELEMENT_TYPE CDefaultGUIElementFactory::getCreateableGUIElementType(s32 idx) const
 {
 	if (idx>=0 && idx<EGUIET_COUNT)
@@ -129,7 +126,7 @@ EGUI_ELEMENT_TYPE CDefaultGUIElementFactory::getCreateableGUIElementType(s32 idx
 }
 
 
-//! Returns the type name of a creatable element type.
+//! Returns the type name of a createable element type.
 const c8* CDefaultGUIElementFactory::getCreateableGUIElementTypeName(s32 idx) const
 {
 	if (idx>=0 && idx<EGUIET_COUNT)
@@ -139,7 +136,7 @@ const c8* CDefaultGUIElementFactory::getCreateableGUIElementTypeName(s32 idx) co
 }
 
 
-//! Returns the type name of a creatable element type.
+//! Returns the type name of a createable element type.
 const c8* CDefaultGUIElementFactory::getCreateableGUIElementTypeName(EGUI_ELEMENT_TYPE type) const
 {
 	// for this factory, type == index

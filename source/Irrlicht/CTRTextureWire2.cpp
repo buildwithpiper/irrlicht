@@ -114,6 +114,7 @@ static inline void swap_xor ( s32 &a, s32 &b )
 */
 void CTRTextureWire2::renderLine ( const s4DVertex *a,const s4DVertex *b ) const
 {
+	
 	int pitch0 = RenderTarget->getDimension().Width << VIDEO_SAMPLE_GRANULARITY;
 	int pitch1 = RenderTarget->getDimension().Width << 2;
 
@@ -168,7 +169,7 @@ void CTRTextureWire2::renderLine ( const s4DVertex *a,const s4DVertex *b ) const
 	if ( 0 == dx )
 		return;
 
-	dst = (tVideoSample*) ( (u8*) (tVideoSample*)RenderTarget->getData() + ( aposy * pitch0 ) + (aposx << VIDEO_SAMPLE_GRANULARITY ) );
+	dst = (tVideoSample*) ( (u8*) (tVideoSample*)RenderTarget->lock() + ( aposy * pitch0 ) + (aposx << VIDEO_SAMPLE_GRANULARITY ) );
 #ifdef USE_ZBUFFER
 	z = (fp24*) ( (u8*) (fp24*) DepthBuffer->lock() + ( aposy * pitch1 ) + (aposx << 2 ) );
 #endif

@@ -51,7 +51,7 @@ namespace gui
 		/** \return: The override color */
 		virtual video::SColor getOverrideColor(void) const = 0;
 
-		//! Sets if the static text should use the override color or the color in the gui skin.
+		//! Sets if the static text should use the overide color or the color in the gui skin.
 		/** \param enable: If set to true, the override color, which can be set
 		with IGUIStaticText::setOverrideColor is used, otherwise the
 		EGDC_BUTTON_TEXT color of the skin. */
@@ -67,13 +67,13 @@ namespace gui
 		//! Sets whether to draw the background
 		virtual void setDrawBackground(bool draw) = 0;
 
-		//! Checks if background drawing is enabled
-		/** \return true if background drawing is enabled, false otherwise */
-		virtual bool isDrawBackgroundEnabled() const = 0;
-
 		//! Gets the background color
 		/** \return: The background color */
 		virtual video::SColor getBackgroundColor() const = 0;
+
+		//! Checks if background drawing is enabled
+		/** \return true if background drawing is enabled, false otherwise */
+		virtual bool isDrawBackgroundEnabled() const = 0;
 
 		//! Sets whether to draw the border
 		virtual void setDrawBorder(bool draw) = 0;

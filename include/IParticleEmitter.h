@@ -40,13 +40,13 @@ const c8* const ParticleEmitterTypeNames[] =
 };
 
 //! A particle emitter for using with particle systems.
-/** A Particle emitter emits new particles into a particle system.
+/** A Particle emitter emitts new particles into a particle system.
 */
 class IParticleEmitter : public virtual io::IAttributeExchangingObject
 {
 public:
 
-	//! Prepares an array with new particles to emit into the system
+	//! Prepares an array with new particles to emitt into the system
 	/** \param now Current time.
 	\param timeSinceLastCall Time elapsed since last call, in milliseconds.
 	\param outArray Pointer which will point to the array with the new
@@ -81,7 +81,7 @@ public:
 	//! Set the maximum particle life-time in milliseconds
 	virtual void setMaxLifeTime( u32 lifeTimeMax ) = 0;
 
-	//! Set maximal random derivation from the direction
+	//!	Set maximal random derivation from the direction
 	virtual void setMaxAngleDegrees( s32 maxAngleDegrees ) = 0;
 
 	//! Get direction the emitter emits particles
@@ -111,8 +111,9 @@ public:
 	//! Get the maximum particle life-time in milliseconds
 	virtual u32 getMaxLifeTime() const = 0;
 
-	//! Get maximal random derivation from the direction
+	//!	Get maximal random derivation from the direction
 	virtual s32 getMaxAngleDegrees() const = 0;
+
 
 	//! Get emitter type
 	virtual E_PARTICLE_EMITTER_TYPE getType() const { return EPET_POINT; }

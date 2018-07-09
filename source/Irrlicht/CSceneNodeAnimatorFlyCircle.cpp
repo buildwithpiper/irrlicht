@@ -15,14 +15,11 @@ CSceneNodeAnimatorFlyCircle::CSceneNodeAnimatorFlyCircle(u32 time,
 		const core::vector3df& center, f32 radius, f32 speed,
 		const core::vector3df& direction, f32 radiusEllipsoid)
 	: Center(center), Direction(direction), Radius(radius),
-	RadiusEllipsoid(radiusEllipsoid), Speed(speed)
+	RadiusEllipsoid(radiusEllipsoid), Speed(speed), StartTime(time)
 {
 	#ifdef _DEBUG
 	setDebugName("CSceneNodeAnimatorFlyCircle");
 	#endif
-
-	StartTime = time;
-
 	init();
 }
 
@@ -48,10 +45,10 @@ void CSceneNodeAnimatorFlyCircle::animateNode(ISceneNode* node, u32 timeMs)
 	f32 time;
 
 	// Check for the condition where the StartTime is in the future.
-	if(StartTime+PauseTimeSum > timeMs)
-		time = ((s32)timeMs - (s32)(StartTime+PauseTimeSum)) * Speed;
+	if(StartTime > timeMs)
+		time = ((s32)timeMs - (s32)StartTime) * Speed;
 	else
-		time = (timeMs-(StartTime+PauseTimeSum)) * Speed;
+		time = (timeMs-StartTime) * Speed;
 
 //	node->setPosition(Center + Radius * ((VecU*cosf(time)) + (VecV*sinf(time))));
 	f32 r2 = RadiusEllipsoid == 0.f ? Radius : RadiusEllipsoid;
@@ -62,8 +59,6 @@ void CSceneNodeAnimatorFlyCircle::animateNode(ISceneNode* node, u32 timeMs)
 //! Writes attributes of the scene node animator.
 void CSceneNodeAnimatorFlyCircle::serializeAttributes(io::IAttributes* out, io::SAttributeReadWriteOptions* options) const
 {
-	ISceneNodeAnimator::serializeAttributes(out, options);
-
 	out->addVector3d("Center", Center);
 	out->addFloat("Radius", Radius);
 	out->addFloat("Speed", Speed);
@@ -75,13 +70,12 @@ void CSceneNodeAnimatorFlyCircle::serializeAttributes(io::IAttributes* out, io::
 //! Reads attributes of the scene node animator.
 void CSceneNodeAnimatorFlyCircle::deserializeAttributes(io::IAttributes* in, io::SAttributeReadWriteOptions* options)
 {
-	ISceneNodeAnimator::deserializeAttributes(in, options);
-
 	Center = in->getAttributeAsVector3d("Center");
 	Radius = in->getAttributeAsFloat("Radius");
 	Speed = in->getAttributeAsFloat("Speed");
 	Direction = in->getAttributeAsVector3d("Direction");
-
+	StartTime = 0;
+	
 	if (Direction.equals(core::vector3df(0,0,0)))
 		Direction.set(0,1,0); // irrlicht 1.1 backwards compatibility
 	else
@@ -94,9 +88,8 @@ void CSceneNodeAnimatorFlyCircle::deserializeAttributes(io::IAttributes* in, io:
 
 ISceneNodeAnimator* CSceneNodeAnimatorFlyCircle::createClone(ISceneNode* node, ISceneManager* newManager)
 {
-	CSceneNodeAnimatorFlyCircle * newAnimator =
+	CSceneNodeAnimatorFlyCircle * newAnimator = 
 		new CSceneNodeAnimatorFlyCircle(StartTime, Center, Radius, Speed, Direction, RadiusEllipsoid);
-	newAnimator->cloneMembers(this);
 
 	return newAnimator;
 }

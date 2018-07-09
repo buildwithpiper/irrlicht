@@ -13,7 +13,7 @@ CMemoryReadWriteFile::CMemoryReadWriteFile(const c8* filename)
 }
 
 
-size_t CMemoryReadWriteFile::write(const void* buffer, size_t sizeToWrite)
+s32 CMemoryReadWriteFile::write(const void* buffer, u32 sizeToWrite)
 {
 	// no point in writing 0 bytes
 	if (sizeToWrite < 1)
@@ -24,7 +24,7 @@ size_t CMemoryReadWriteFile::write(const void* buffer, size_t sizeToWrite)
 		Data.set_used(Pos+sizeToWrite);
 
 	// copy data
-	memcpy( (void*) &Data[Pos], buffer, sizeToWrite);
+	memcpy( (void*) &Data[Pos], buffer, (size_t) sizeToWrite);
 
 	Pos += sizeToWrite;
 
@@ -75,25 +75,21 @@ long CMemoryReadWriteFile::getSize() const
 }
 
 
-size_t CMemoryReadWriteFile::read(void* buffer, size_t sizeToRead)
+s32 CMemoryReadWriteFile::read(void* buffer, u32 sizeToRead)
 {
 	// cant read past the end
-	if ((size_t)Pos + sizeToRead >= Data.size())
-		sizeToRead = Data.size() - (size_t)Pos;
+	if (Pos + sizeToRead >= Data.size())
+		sizeToRead = Data.size() - Pos;
 
 	// cant read 0 bytes
 	if (!sizeToRead)
 		return 0;
 
 	// copy data
-	memcpy( buffer, (void*) &Data[Pos], sizeToRead);
+	memcpy( buffer, (void*) &Data[Pos], (size_t) sizeToRead);
 
-	Pos += (long)sizeToRead;
+	Pos += sizeToRead;
 
 	return sizeToRead;
 }
 
-bool CMemoryReadWriteFile::flush()
-{
-	return true;	// no buffering, nothing to do
-}

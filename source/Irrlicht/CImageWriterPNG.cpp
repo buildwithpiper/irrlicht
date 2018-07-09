@@ -125,19 +125,19 @@ bool CImageWriterPNG::writeImage(io::IWriteFile* file, IImage* image,u32 param) 
 
 	s32 lineWidth = image->getDimension().Width;
 	switch(image->getColorFormat())
-	{
-	case ECF_R8G8B8:
-	case ECF_R5G6B5:
-		lineWidth*=3;
-		break;
-	case ECF_A8R8G8B8:
-	case ECF_A1R5G5B5:
-		lineWidth*=4;
+	{ 	 
+	case ECF_R8G8B8: 	 
+	case ECF_R5G6B5: 	 
+		lineWidth*=3; 	 
+		break; 	 
+	case ECF_A8R8G8B8: 	 
+	case ECF_A1R5G5B5: 	 
+		lineWidth*=4; 	 
 		break;
 	// TODO: Error handling in case of unsupported color format
 	default:
 		break;
-	}
+	} 	 
 	u8* tmpImage = new u8[image->getDimension().Height*lineWidth];
 	if (!tmpImage)
 	{
@@ -146,7 +146,7 @@ bool CImageWriterPNG::writeImage(io::IWriteFile* file, IImage* image,u32 param) 
 		return false;
 	}
 
-	u8* data = (u8*)image->getData();
+	u8* data = (u8*)image->lock();
 	switch(image->getColorFormat())
 	{
 	case ECF_R8G8B8:
@@ -167,6 +167,7 @@ bool CImageWriterPNG::writeImage(io::IWriteFile* file, IImage* image,u32 param) 
 		break;
 #endif
 	}
+	image->unlock();
 
 	// Create array of pointers to rows in image data
 

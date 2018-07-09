@@ -67,6 +67,10 @@ public:
 		bool operator ==(const ConstIterator& other) const { return Current == other.Current; }
 		bool operator !=(const ConstIterator& other) const { return Current != other.Current; }
 
+		#if defined (_MSC_VER) && (_MSC_VER < 1300)
+			#pragma warning(disable:4284) // infix notation problem when using iterator operator ->
+		#endif
+
 		T & operator * () { return Current->Element; }
 		T * operator ->() { return &Current->Element; }
 
@@ -382,16 +386,16 @@ public:
 	}
 
 	//! Swap the content of this list container with the content of another list
-	/** Afterward this object will contain the content of the other object and the other
-	object will contain the content of this object. Iterators will afterward be valid for
+	/** Afterwards this object will contain the content of the other object and the other
+	object will contain the content of this object. Iterators will afterwards be valid for
 	the swapped object.
-	\param other Swap content with this object */
+	\param other Swap content with this object	*/
 	void swap(list<T>& other)
 	{
 		core::swap(First, other.First);
 		core::swap(Last, other.Last);
 		core::swap(Size, other.Size);
-		core::swap(allocator, other.allocator); // memory is still released by the same allocator used for allocation
+		core::swap(allocator, other.allocator);	// memory is still released by the same allocator used for allocation
 	}
 
 

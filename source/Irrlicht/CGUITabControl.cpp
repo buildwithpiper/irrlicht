@@ -108,6 +108,7 @@ video::SColor CGUITab::getTextColor() const
 //! returns true if the tab is drawing its background, false if not
 bool CGUITab::isDrawingBackground() const
 {
+	_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 	return DrawBackground;
 }
 
@@ -580,14 +581,12 @@ void CGUITabControl::draw()
 
 	core::rect<s32> frameRect(AbsoluteRect);
 
-	// some empty background as placeholder when there are no tabs
 	if (Tabs.empty())
 		driver->draw2DRectangle(skin->getColor(EGDC_3D_HIGH_LIGHT), frameRect, &AbsoluteClippingRect);
 
 	if (!font)
 		return;
 
-	// tab button bar can be above or below the tabs
 	if ( VerticalAlignment == EGUIA_UPPERLEFT )
 	{
 		frameRect.UpperLeftCorner.Y += 2;
@@ -612,7 +611,6 @@ void CGUITabControl::draw()
 	//const wchar_t* activetext = 0;
 	CGUITab *activeTab = 0;
 
-	// Draw all tab-buttons except the active one
 	for (u32 i=CurrentScrollTabIndex; i<Tabs.size(); ++i)
 	{
 		// get Text
@@ -639,7 +637,6 @@ void CGUITabControl::draw()
 
 		if ((s32)i == ActiveTab)
 		{
-			// for active button just remember values
 			left = frameRect.UpperLeftCorner.X;
 			right = frameRect.LowerRightCorner.X;
 			//activetext = text;
@@ -657,8 +654,7 @@ void CGUITabControl::draw()
 		}
 	}
 
-	// Draw active tab button
-	// Drawn later than other buttons because it draw over the buttons before/after it.
+	// draw active tab
 	if (left != 0 && right != 0 && activeTab != 0)
 	{
 		// draw upper highlight frame
@@ -688,6 +684,7 @@ void CGUITabControl::draw()
 		}
 		else
 		{
+
 			frameRect.UpperLeftCorner.X = left-2;
 			frameRect.LowerRightCorner.X = right+2;
 			frameRect.LowerRightCorner.Y += 2;
@@ -711,26 +708,24 @@ void CGUITabControl::draw()
 	}
 	else
 	{
-		// No active tab
-		// Draw a line separating button bar from tab area
-		tr.UpperLeftCorner.X = AbsoluteRect.UpperLeftCorner.X;
-		tr.LowerRightCorner.X = AbsoluteRect.LowerRightCorner.X;
-		tr.UpperLeftCorner.Y = frameRect.LowerRightCorner.Y - 1;
-		tr.LowerRightCorner.Y = frameRect.LowerRightCorner.Y;
-
 		if ( VerticalAlignment == EGUIA_UPPERLEFT )
 		{
+			tr.UpperLeftCorner.X = AbsoluteRect.UpperLeftCorner.X;
+			tr.LowerRightCorner.X = AbsoluteRect.LowerRightCorner.X;
+			tr.UpperLeftCorner.Y = frameRect.LowerRightCorner.Y - 1;
+			tr.LowerRightCorner.Y = frameRect.LowerRightCorner.Y;
 			driver->draw2DRectangle(skin->getColor(EGDC_3D_HIGH_LIGHT), tr, &AbsoluteClippingRect);
 		}
 		else
 		{
+			tr.UpperLeftCorner.X = AbsoluteRect.UpperLeftCorner.X;
+			tr.LowerRightCorner.X = 1000;
 			tr.UpperLeftCorner.Y = frameRect.UpperLeftCorner.Y - 1;
 			tr.LowerRightCorner.Y = frameRect.UpperLeftCorner.Y;
 			driver->draw2DRectangle(skin->getColor(EGDC_3D_DARK_SHADOW), tr, &AbsoluteClippingRect);
 		}
 	}
 
-	// drawing some border and background for the tab-area.
 	skin->draw3DTabBody(this, Border, FillBackground, AbsoluteRect, &AbsoluteClippingRect, TabHeight, VerticalAlignment);
 
 	// enable scrollcontrols on need

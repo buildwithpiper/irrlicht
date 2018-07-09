@@ -13,7 +13,7 @@ namespace irr
 namespace io
 {
 
-	//! Interface providing read access to a file.
+	//! Interface providing read acess to a file.
 	class IReadFile : public virtual IReferenceCounted
 	{
 	public:
@@ -21,7 +21,7 @@ namespace io
 		/** \param buffer Pointer to buffer where read bytes are written to.
 		\param sizeToRead Amount of bytes to read from the file.
 		\return How many bytes were read. */
-		virtual size_t read(void* buffer, size_t sizeToRead) = 0;
+		virtual s32 read(void* buffer, u32 sizeToRead) = 0;
 
 		//! Changes position in file
 		/** \param finalPos Destination position in the file.
@@ -36,7 +36,7 @@ namespace io
 		virtual long getSize() const = 0;
 
 		//! Get the current position in the file.
-		/** \return Current position in the file in bytes on success or -1L on failure. */
+		/** \return Current position in the file in bytes. */
 		virtual long getPos() const = 0;
 
 		//! Get name of file.
@@ -45,7 +45,11 @@ namespace io
 	};
 
 	//! Internal function, please do not use.
+	IReadFile* createReadFile(const io::path& fileName);
+	//! Internal function, please do not use.
 	IReadFile* createLimitReadFile(const io::path& fileName, IReadFile* alreadyOpenedFile, long pos, long areaSize);
+	//! Internal function, please do not use.
+	IReadFile* createMemoryReadFile(void* memory, long size, const io::path& fileName, bool deleteMemoryWhenDropped);
 
 } // end namespace io
 } // end namespace irr

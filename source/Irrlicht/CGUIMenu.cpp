@@ -130,6 +130,11 @@ bool CGUIMenu::OnEvent(const SEvent& event)
 			{
 			case EMIE_LMOUSE_PRESSED_DOWN:
 			{
+				if (!Environment->hasFocus(this))
+				{
+					Environment->setFocus(this);
+				}
+
 				if (Parent)
 					Parent->bringToFront(this);
 

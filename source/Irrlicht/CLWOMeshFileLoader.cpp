@@ -2,11 +2,7 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
-#include "IrrCompileConfig.h"
-#ifdef _IRR_COMPILE_WITH_LWO_LOADER_
-
 #include "CLWOMeshFileLoader.h"
-#include "CMeshTextureLoader.h"
 #include "os.h"
 #include "SAnimatedMesh.h"
 #include "SMesh.h"
@@ -127,8 +123,6 @@ CLWOMeshFileLoader::CLWOMeshFileLoader(scene::ISceneManager* smgr,
 	#ifdef _DEBUG
 	setDebugName("CLWOMeshFileLoader");
 	#endif
-
-	TextureLoader = new CMeshTextureLoader( FileSystem, SceneManager->getVideoDriver() );
 }
 
 
@@ -151,9 +145,6 @@ bool CLWOMeshFileLoader::isALoadableFileExtension(const io::path& filename) cons
 //! creates/loads an animated mesh from the file.
 IAnimatedMesh* CLWOMeshFileLoader::createMesh(io::IReadFile* file)
 {
-	if ( getMeshTextureLoader() )
-		getMeshTextureLoader()->setMeshFile(file);
-
 	File = file;
 
 	if (Mesh)
@@ -2099,18 +2090,25 @@ bool CLWOMeshFileLoader::readFileHeader()
 
 video::ITexture* CLWOMeshFileLoader::loadTexture(const core::stringc& file)
 {
-	video::ITexture* texture = getMeshTextureLoader() ? getMeshTextureLoader()->getTexture(file) : NULL;
+	video::IVideoDriver* driver = SceneManager->getVideoDriver();
 
-	if (!texture)
-	{
-		os::Printer::log("Could not load texture", file.c_str(), ELL_WARNING);
-	}
+	if (FileSystem->existFile(file))
+		return driver->getTexture(file);
 
-	return texture;
+	core::stringc strippedName=FileSystem->getFileBasename(file);
+	if (FileSystem->existFile(strippedName))
+		return driver->getTexture(strippedName);
+	core::stringc newpath = FileSystem->getFileDir(File->getFileName());
+	newpath.append("/");
+	newpath.append(strippedName);
+	if (FileSystem->existFile(newpath))
+		return driver->getTexture(newpath);
+	os::Printer::log("Could not load texture", file.c_str(), ELL_WARNING);
+
+	return 0;
 }
 
 
 } // end namespace scene
 } // end namespace irr
 
-#endif // _IRR_COMPILE_WITH_LWO_LOADER_

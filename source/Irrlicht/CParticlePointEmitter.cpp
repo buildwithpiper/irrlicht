@@ -3,9 +3,6 @@
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
 #include "CParticlePointEmitter.h"
-
-#ifdef _IRR_COMPILE_WITH_PARTICLES_
-
 #include "os.h"
 #include "IAttributes.h"
 
@@ -28,7 +25,7 @@ CParticlePointEmitter::CParticlePointEmitter(
 	MaxParticlesPerSecond(maxParticlesPerSecond),
 	MinStartColor(minStartColor), MaxStartColor(maxStartColor),
 	MinLifeTime(lifeTimeMin), MaxLifeTime(lifeTimeMax),
-	MaxAngleDegrees(maxAngleDegrees), Time(0)
+	MaxAngleDegrees(maxAngleDegrees), Time(0), Emitted(0)
 {
 	#ifdef _DEBUG
 	setDebugName("CParticlePointEmitter");
@@ -94,7 +91,7 @@ void CParticlePointEmitter::serializeAttributes(io::IAttributes* out, io::SAttri
 	out->addFloat("MinStartSizeWidth", MinStartSize.Width);
 	out->addFloat("MinStartSizeHeight", MinStartSize.Height);
 	out->addFloat("MaxStartSizeWidth", MaxStartSize.Width);
-	out->addFloat("MaxStartSizeHeight", MaxStartSize.Height);
+	out->addFloat("MaxStartSizeHeight", MaxStartSize.Height); 
 	out->addInt("MinParticlesPerSecond", MinParticlesPerSecond);
 	out->addInt("MaxParticlesPerSecond", MaxParticlesPerSecond);
 	out->addColor("MinStartColor", MinStartColor);
@@ -148,4 +145,3 @@ void CParticlePointEmitter::deserializeAttributes(io::IAttributes* in, io::SAttr
 } // end namespace scene
 } // end namespace irr
 
-#endif // _IRR_COMPILE_WITH_PARTICLES_

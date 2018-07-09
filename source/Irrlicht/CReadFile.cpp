@@ -29,12 +29,12 @@ CReadFile::~CReadFile()
 
 
 //! returns how much was read
-size_t CReadFile::read(void* buffer, size_t sizeToRead)
+s32 CReadFile::read(void* buffer, u32 sizeToRead)
 {
 	if (!isOpen())
 		return 0;
 
-	return fread(buffer, 1, sizeToRead, File);
+	return (s32)fread(buffer, 1, sizeToRead, File);
 }
 
 
@@ -97,7 +97,8 @@ const io::path& CReadFile::getFileName() const
 }
 
 
-IReadFile* CReadFile::createReadFile(const io::path& fileName)
+
+IReadFile* createReadFile(const io::path& fileName)
 {
 	CReadFile* file = new CReadFile(fileName);
 	if (file->isOpen())

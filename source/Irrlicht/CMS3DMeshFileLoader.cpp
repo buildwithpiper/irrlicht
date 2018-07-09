@@ -159,7 +159,7 @@ bool CMS3DMeshFileLoader::load(io::IReadFile* file)
 	// read whole file
 
 	u8* buffer = new u8[fileSize];
-	long read = (long)file->read(buffer, fileSize);
+	s32 read = file->read(buffer, fileSize);
 	if (read != fileSize)
 	{
 		delete [] buffer;
@@ -501,7 +501,7 @@ bool CMS3DMeshFileLoader::load(io::IReadFile* file)
 
 			tmpMatrix=jnt->LocalMatrix*tmpMatrix;
 
-			// IRR_TEST_BROKEN_QUATERNION_USE: TODO - switched from tmpMatrix to tmpMatrix.getTransposed() for downward compatibility.
+			// IRR_TEST_BROKEN_QUATERNION_USE: TODO - switched from tmpMatrix to tmpMatrix.getTransposed() for downward compatibility. 
 			//								   Not tested so far if this was correct or wrong before quaternion fix!
 			k->rotation  = core::quaternion(tmpMatrix.getTransposed());
 		}

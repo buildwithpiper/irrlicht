@@ -126,6 +126,7 @@ bool CGUIInOutFader::isReady() const
 {
 	u32 now = os::Timer::getTime();
 	bool ret = (now > EndTime);
+	_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 	return ret;
 }
 

@@ -43,7 +43,6 @@ namespace core
 	//! Rounding error constant often used when comparing f32 values.
 
 	const s32 ROUNDING_ERROR_S32 = 0;
-
 #ifdef __IRR_HAS_S64
 	const s64 ROUNDING_ERROR_S64 = 0;
 #endif
@@ -54,19 +53,19 @@ namespace core
 #undef PI
 #endif
 	//! Constant for PI.
-	const f32 PI = 3.14159265359f;
+	const f32 PI		= 3.14159265359f;
 
 	//! Constant for reciprocal of PI.
-	const f32 RECIPROCAL_PI = 1.0f/PI;
+	const f32 RECIPROCAL_PI	= 1.0f/PI;
 
 	//! Constant for half of PI.
-	const f32 HALF_PI = PI/2.0f;
+	const f32 HALF_PI	= PI/2.0f;
 
 #ifdef PI64 // make sure we don't collide with a define
 #undef PI64
 #endif
 	//! Constant for 64bit PI.
-	const f64 PI64 = 3.1415926535897932384626433832795028841971693993751;
+	const f64 PI64		= 3.1415926535897932384626433832795028841971693993751;
 
 	//! Constant for 64bit reciprocal of PI.
 	const f64 RECIPROCAL_PI64 = 1.0/PI64;
@@ -85,7 +84,7 @@ namespace core
 
 	//! Utility function to convert a radian value to degrees
 	/** Provided as it can be clearer to write radToDeg(X) than RADTODEG * X
-	\param radians The radians value to convert to degrees.
+	\param radians	The radians value to convert to degrees.
 	*/
 	inline f32 radToDeg(f32 radians)
 	{
@@ -94,7 +93,7 @@ namespace core
 
 	//! Utility function to convert a radian value to degrees
 	/** Provided as it can be clearer to write radToDeg(X) than RADTODEG * X
-	\param radians The radians value to convert to degrees.
+	\param radians	The radians value to convert to degrees.
 	*/
 	inline f64 radToDeg(f64 radians)
 	{
@@ -103,7 +102,7 @@ namespace core
 
 	//! Utility function to convert a degrees value to radians
 	/** Provided as it can be clearer to write degToRad(X) than DEGTORAD * X
-	\param degrees The degrees value to convert to radians.
+	\param degrees	The degrees value to convert to radians.
 	*/
 	inline f32 degToRad(f32 degrees)
 	{
@@ -112,7 +111,7 @@ namespace core
 
 	//! Utility function to convert a degrees value to radians
 	/** Provided as it can be clearer to write degToRad(X) than DEGTORAD * X
-	\param degrees The degrees value to convert to radians.
+	\param degrees	The degrees value to convert to radians.
 	*/
 	inline f64 degToRad(f64 degrees)
 	{
@@ -182,85 +181,16 @@ namespace core
 		b = c;
 	}
 
-	template <class T>
-	inline T roundingError();
-
-	template <>
-	inline f32 roundingError()
-	{
-		return ROUNDING_ERROR_f32;
-	}
-
-	template <>
-	inline f64 roundingError()
-	{
-		return ROUNDING_ERROR_f64;
-	}
-
-	template <>
-	inline s32 roundingError()
-	{
-		return ROUNDING_ERROR_S32;
-	}
-
-	template <>
-	inline u32 roundingError()
-	{
-		return ROUNDING_ERROR_S32;
-	}
-
-#ifdef __IRR_HAS_S64
-	template <>
-	inline s64 roundingError()
-	{
-		return ROUNDING_ERROR_S64;
-	}
-
-	template <>
-	inline u64 roundingError()
-	{
-		return ROUNDING_ERROR_S64;
-	}
-#endif
-
-	template <class T>
-	inline T relativeErrorFactor()
-	{
-		return 1;
-	}
-
-	template <>
-	inline f32 relativeErrorFactor()
-	{
-		return 4;
-	}
-
-	template <>
-	inline f64 relativeErrorFactor()
-	{
-		return 8;
-	}
-
 	//! returns if a equals b, taking possible rounding errors into account
-	template <class T>
-	inline bool equals(const T a, const T b, const T tolerance = roundingError<T>()) 
+	inline bool equals(const f64 a, const f64 b, const f64 tolerance = ROUNDING_ERROR_f64)
 	{
 		return (a + tolerance >= b) && (a - tolerance <= b);
 	}
 
-
-	//! returns if a equals b, taking relative error in form of factor
-	//! this particular function does not involve any division.
-	template <class T>
-	inline bool equalsRelative( const T a, const T b, const T factor = relativeErrorFactor<T>())
+	//! returns if a equals b, taking possible rounding errors into account
+	inline bool equals(const f32 a, const f32 b, const f32 tolerance = ROUNDING_ERROR_f32)
 	{
-		//https://eagergames.wordpress.com/2017/04/01/fast-parallel-lines-and-vectors-test/
-
-		const T maxi = max_( a, b);
-		const T mini = min_( a, b);
-		const T maxMagnitude = max_( maxi, -mini);
-
-		return	(maxMagnitude*factor + maxi) == (maxMagnitude*factor + mini); // MAD Wise
+		return (a + tolerance >= b) && (a - tolerance <= b);
 	}
 
 	union FloatIntUnion32
@@ -302,6 +232,39 @@ namespace core
 
 		return false;
 	}
+
+#if 0
+	//! returns if a equals b, not using any rounding tolerance
+	inline bool equals(const s32 a, const s32 b)
+	{
+		return (a == b);
+	}
+
+	//! returns if a equals b, not using any rounding tolerance
+	inline bool equals(const u32 a, const u32 b)
+	{
+		return (a == b);
+	}
+#endif
+	//! returns if a equals b, taking an explicit rounding tolerance into account
+	inline bool equals(const s32 a, const s32 b, const s32 tolerance = ROUNDING_ERROR_S32)
+	{
+		return (a + tolerance >= b) && (a - tolerance <= b);
+	}
+
+	//! returns if a equals b, taking an explicit rounding tolerance into account
+	inline bool equals(const u32 a, const u32 b, const s32 tolerance = ROUNDING_ERROR_S32)
+	{
+		return (a + tolerance >= b) && (a - tolerance <= b);
+	}
+
+#ifdef __IRR_HAS_S64
+	//! returns if a equals b, taking an explicit rounding tolerance into account
+	inline bool equals(const s64 a, const s64 b, const s64 tolerance = ROUNDING_ERROR_S64)
+	{
+		return (a + tolerance >= b) && (a - tolerance <= b);
+	}
+#endif
 
 	//! returns if a equals zero, taking rounding errors into account
 	inline bool iszero(const f64 a, const f64 tolerance = ROUNDING_ERROR_f64)
@@ -359,7 +322,7 @@ namespace core
 	}
 
 	/*
-		float IEEE-754 bit representation
+		float IEEE-754 bit represenation
 
 		0      0x00000000
 		1.0    0x3f800000
@@ -385,26 +348,26 @@ namespace core
 	//! code is taken from IceFPU
 	//! Integer representation of a floating-point value.
 #ifdef IRRLICHT_FAST_MATH
-	#define IR(x)			((u32&)(x))
+	#define IR(x)                           ((u32&)(x))
 #else
 	inline u32 IR(f32 x) {inttofloat tmp; tmp.f=x; return tmp.u;}
 #endif
 
 	//! Absolute integer representation of a floating-point value
-	#define AIR(x)			(IR(x)&0x7fffffff)
+	#define AIR(x)				(IR(x)&0x7fffffff)
 
 	//! Floating-point representation of an integer value.
 #ifdef IRRLICHT_FAST_MATH
-	#define FR(x)			((f32&)(x))
+	#define FR(x)                           ((f32&)(x))
 #else
 	inline f32 FR(u32 x) {inttofloat tmp; tmp.u=x; return tmp.f;}
 	inline f32 FR(s32 x) {inttofloat tmp; tmp.s=x; return tmp.f;}
 #endif
 
 	//! integer representation of 1.0
-	#define IEEE_1_0		0x3f800000
+	#define IEEE_1_0			0x3f800000
 	//! integer representation of 255.0
-	#define IEEE_255_0		0x437f0000
+	#define IEEE_255_0			0x437f0000
 
 #ifdef IRRLICHT_FAST_MATH
 	#define	F32_LOWER_0(f)		(F32_AS_U32(f) >  F32_SIGN_BIT)
@@ -439,7 +402,7 @@ namespace core
 
 #if defined(__BORLANDC__) || defined (__BCPLUSPLUS__)
 
-	// 8-bit bools in Borland builder
+	// 8-bit bools in borland builder
 
 	//! conditional set based on mask and arithmetic shift
 	REALINLINE u32 if_c_a_else_b ( const c8 condition, const u32 a, const u32 b )
@@ -478,7 +441,7 @@ namespace core
 	*/
 	REALINLINE void setbit_cond ( u32 &state, s32 condition, u32 mask )
 	{
-		// 0, or any positive to mask
+		// 0, or any postive to mask
 		//s32 conmask = -condition >> 31;
 		state ^= ( ( -condition >> 31 ) ^ state ) & mask;
 	}
@@ -492,13 +455,15 @@ namespace core
 	{
 #ifdef IRRLICHT_FAST_MATH
 		return;
-	#ifdef feclearexcept
+#ifdef feclearexcept
 		feclearexcept(FE_ALL_EXCEPT);
-	#elif defined(_MSC_VER)
+#elif defined(_MSC_VER)
 		__asm fnclex;
-	#elif defined(__GNUC__) && defined(__x86__)
+#elif defined(__GNUC__) && defined(__x86__)
 		__asm__ __volatile__ ("fclex \n\t");
-	#endif
+#else
+#  warn clearFPUException not supported.
+#endif
 #endif
 	}
 
@@ -573,9 +538,8 @@ namespace core
 
 		// SSE Newton-Raphson reciprocal estimate, accurate to 23 significant
 		// bi ts of the mantissa
-		// One Newton-Raphson Iteration:
+		// One Newtown-Raphson Iteration:
 		// f(i+1) = 2 * rcpss(f) - f * rcpss(f) * rcpss(f)
-#if defined(_MSC_VER)
 		f32 rec;
 		__asm rcpss xmm0, f               // xmm0 = rcpss(f)
 		__asm movss xmm1, f               // xmm1 = f
@@ -586,9 +550,8 @@ namespace core
 										  //        - f * rcpss(f) * rcpss(f)
 		__asm movss rec, xmm0             // return xmm0
 		return rec;
-#else // no support yet for other compilers
-		return 1.f / f;
-#endif
+
+
 		//! i do not divide through 0.. (fpu expection)
 		// instead set f to a high value to get a return value near zero..
 		// -1000000000000.f.. is use minus to stay negative..
@@ -615,9 +578,8 @@ namespace core
 
 		// SSE Newton-Raphson reciprocal estimate, accurate to 23 significant
 		// bi ts of the mantissa
-		// One Newton-Raphson Iteration:
+		// One Newtown-Raphson Iteration:
 		// f(i+1) = 2 * rcpss(f) - f * rcpss(f) * rcpss(f)
-#if defined(_MSC_VER)
 		f32 rec;
 		__asm rcpss xmm0, f               // xmm0 = rcpss(f)
 		__asm movss xmm1, f               // xmm1 = f
@@ -628,9 +590,7 @@ namespace core
 										  //        - f * rcpss(f) * rcpss(f)
 		__asm movss rec, xmm0             // return xmm0
 		return rec;
-#else // no support yet for other compilers
-		return 1.f / f;
-#endif
+
 
 /*
 		// SSE reciprocal estimate, accurate to 12 significant bits of
@@ -673,6 +633,7 @@ namespace core
 			: "st"
 			);
 #else
+#  warn IRRLICHT_FAST_MATH not supported.
 		return (s32) floorf ( x );
 #endif
 		return t;
@@ -705,6 +666,7 @@ namespace core
 			: "st"
 			);
 #else
+#  warn IRRLICHT_FAST_MATH not supported.
 		return (s32) ceilf ( x );
 #endif
 		return t;
@@ -734,6 +696,7 @@ namespace core
 			: "st"
 			);
 #else
+#  warn IRRLICHT_FAST_MATH not supported.
 		return (s32) round_(x);
 #endif
 		return t;

@@ -8,7 +8,6 @@ node callbacks, are left out for simplicity of the example.
 
 #include <irrlicht.h>
 #include "driverChoice.h"
-#include "exampleHelper.h"
 
 using namespace irr;
 using namespace core;
@@ -291,13 +290,11 @@ int main(int argumentCount, char * argumentValues[])
 	scene::ISceneManager* smgr = device->getSceneManager();
 	gui::IGUIEnvironment* guienv = device->getGUIEnvironment();
 
-	const io::path mediaPath = getExampleMediaPath();
-
 	gui::IGUISkin* skin = guienv->getSkin();
 	if (skin)
 	{
 		skin->setColor(gui::EGDC_BUTTON_TEXT, video::SColor(255, 255, 255, 255));
-		gui::IGUIFont* font = guienv->getFont(mediaPath + "fontlucida.png");
+		gui::IGUIFont* font = guienv->getFont("../../media/fontlucida.png");
 		if(font)
 			skin->setFont(font);
 	}
@@ -328,21 +325,21 @@ Add several "zones".  You could use this technique to light individual rooms, fo
 			scene::IBillboardSceneNode * billboard = smgr->addBillboardSceneNode(node);
 			billboard->setPosition(vector3df(0, -14, 30));
 			billboard->setMaterialType(video::EMT_TRANSPARENT_ADD_COLOR );
-			billboard->setMaterialTexture(0, driver->getTexture(mediaPath + "particle.bmp"));
+			billboard->setMaterialTexture(0, driver->getTexture("../../media/particle.bmp"));
 			billboard->setMaterialFlag(video::EMF_LIGHTING, false);
 			smgr->addLightSceneNode(billboard, vector3df(0, 0, 0), video::SColorf(1, 0, 0), lightRadius);
 
 			billboard = smgr->addBillboardSceneNode(node);
 			billboard->setPosition(vector3df(-21, -14, -21));
 			billboard->setMaterialType(video::EMT_TRANSPARENT_ADD_COLOR );
-			billboard->setMaterialTexture(0, driver->getTexture(mediaPath + "particle.bmp"));
+			billboard->setMaterialTexture(0, driver->getTexture("../../media/particle.bmp"));
 			billboard->setMaterialFlag(video::EMF_LIGHTING, false);
 			smgr->addLightSceneNode(billboard, vector3df(0, 0, 0), video::SColorf(0, 1, 0), lightRadius);
 
 			billboard = smgr->addBillboardSceneNode(node);
 			billboard->setPosition(vector3df(21, -14, -21));
 			billboard->setMaterialType(video::EMT_TRANSPARENT_ADD_COLOR );
-			billboard->setMaterialTexture(0, driver->getTexture(mediaPath + "particle.bmp"));
+			billboard->setMaterialTexture(0, driver->getTexture("../../media/particle.bmp"));
 			billboard->setMaterialFlag(video::EMF_LIGHTING, false);
 			smgr->addLightSceneNode(billboard, vector3df(0, 0, 0), video::SColorf(0, 0, 1), lightRadius);
 
@@ -362,7 +359,7 @@ Add several "zones".  You could use this technique to light individual rooms, fo
 
 	while(device->run())
 	{
-		driver->beginScene(video::ECBF_COLOR | video::ECBF_DEPTH, video::SColor(255,100,101,140));
+		driver->beginScene(true, true, video::SColor(255,100,101,140));
 		smgr->drawAll();
 		guienv->drawAll();
 		driver->endScene();

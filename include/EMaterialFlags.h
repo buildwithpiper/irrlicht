@@ -84,10 +84,7 @@ namespace video
 		EMF_BLEND_OPERATION = 0x40000,
 
 		//! Flag for polygon offset
-		EMF_POLYGON_OFFSET = 0x80000,
-
-        //! Flag for blend factor
-		EMF_BLEND_FACTOR = 0x160000
+		EMF_POLYGON_OFFSET = 0x80000
 	};
 
 } // end namespace video

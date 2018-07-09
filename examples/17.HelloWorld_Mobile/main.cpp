@@ -1,9 +1,8 @@
-/** Deprecated. This was Example 017 Helloworld mobile for WinCE 6.
-	But WinCE6 support has been removed for Irrlicht 1.9. 
-	If you still need that please use Irrlicht 1.8 or svn revision 5045 which was the last one to include it.
-
-	Sources still kept for now as it compiles on other platform too. And we might use this example again 
-	once we support Windows RT.
+/** Example 017 Helloworld mobile
+	This example show Hello World for Windows mobile.
+	It compiles on other platform too. The only differences between the original
+	examples are. You need a GUI, because otherwise you can't quit the application.
+	You need a Filesystem, which is relative based to your executable.
 */
 
 #include <irrlicht.h>
@@ -115,8 +114,13 @@ IrrlichtDevice *startup()
 	// create device
 	IrrlichtDevice *device = 0;
 
-	// Use window mode on PC
+#if defined (_IRR_USE_WINDOWS_CE_DEVICE_)
+	// set to standard mobile fullscreen 240x320
+	device = createDevice(driverType, dimension2d<u32>(240, 320), 16, true );
+#else
+	// on PC. use window mode
 	device = createDevice(driverType, dimension2d<u32>(240, 320), 16, false );
+#endif		
 	if ( 0 == device )
 		return 0;
 
@@ -480,7 +484,9 @@ int example_helloworld()
 
 }
 
-#if defined (_IRR_WINDOWS_)
+#if defined (_IRR_USE_WINDOWS_CE_DEVICE_)
+	#pragma comment(linker, "/subsystem:WINDOWSCE /ENTRY:main") 
+#elif defined (_IRR_WINDOWS_)
 	#pragma comment(linker, "/subsystem:windows /ENTRY:mainCRTStartup")
 #endif
 

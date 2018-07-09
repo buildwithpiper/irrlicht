@@ -42,7 +42,7 @@ namespace scene
 
 		//! Will be called when the animation playback has ended.
 		/** See IAnimatedMeshSceneNode::setAnimationEndCallback for
-		more information.
+		more informations.
 		\param node: Node of which the animation has ended. */
 		virtual void OnAnimationEnd(IAnimatedMeshSceneNode* node) = 0;
 	};
@@ -72,11 +72,7 @@ namespace scene
 		virtual void setCurrentFrame(f32 frame) = 0;
 
 		//! Sets the frame numbers between the animation is looped.
-		/** The default is 0 to getFrameCount()-1 of the mesh.
-		Number of played frames is end-start.
-		It interpolates toward the last frame but stops when it is reached.
-		It does not interpolate back to start even when looping.
-		Looping animations should ensure last and first frame-key are identical.
+		/** The default is 0 - MaximalFrameCount of the mesh.
 		\param begin: Start frame number of the loop.
 		\param end: End frame number of the loop.
 		\return True if successful, false if not. */
@@ -94,7 +90,7 @@ namespace scene
 		/** The shadow can be rendered using the ZPass or the zfail
 		method. ZPass is a little bit faster because the shadow volume
 		creation is easier, but with this method there occur ugly
-		looking artifacts when the camera is inside the shadow volume.
+		looking artifacs when the camera is inside the shadow volume.
 		These error do not occur with the ZFail method.
 		\param shadowMesh: Optional custom mesh for shadow volume.
 		\param id: Id of the shadow scene node. This id can be used to

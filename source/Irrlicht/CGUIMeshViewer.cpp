@@ -153,8 +153,8 @@ void CGUIMeshViewer::draw()
 			scene::IMeshBuffer* mb = m->getMeshBuffer(i);
 			driver->drawVertexPrimitiveList(mb->getVertices(),
 					mb->getVertexCount(), mb->getIndices(),
-					mb->getPrimitiveCount(), mb->getVertexType(),
-					mb->getPrimitiveType(), mb->getIndexType());
+					mb->getIndexCount()/ 3, mb->getVertexType(),
+					scene::EPT_TRIANGLES, mb->getIndexType());
 		}
 
 		driver->setViewPort(oldViewPort);

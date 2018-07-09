@@ -13,12 +13,12 @@
 #include "plane3d.h"
 #include "dimension2d.h"
 #include "position2d.h"
+#include "SMaterial.h"
 #include "IMeshBuffer.h"
 #include "triangle3d.h"
 #include "EDriverTypes.h"
 #include "EDriverFeatures.h"
 #include "SExposedVideoData.h"
-#include "SOverrideMaterial.h"
 
 namespace irr
 {
@@ -47,7 +47,6 @@ namespace video
 	class IImageWriter;
 	class IMaterialRenderer;
 	class IGPUProgrammingServices;
-	class IRenderTarget;
 
 	//! enumeration for geometry transformation states
 	enum E_TRANSFORMATION_STATE
@@ -130,16 +129,6 @@ namespace video
 		ERT_AUX_BUFFER4
 	};
 
-	//! Enum for the flags of clear buffer
-	enum E_CLEAR_BUFFER_FLAG
-	{
-		ECBF_NONE = 0,
-		ECBF_COLOR = 1,
-		ECBF_DEPTH = 2,
-		ECBF_STENCIL = 4,
-		ECBF_ALL = ECBF_COLOR|ECBF_DEPTH|ECBF_STENCIL
-	};
-
 	//! Enum for the types of fog distributions to choose from
 	enum E_FOG_TYPE
 	{
@@ -156,6 +145,106 @@ namespace video
 		0
 	};
 
+	struct SOverrideMaterial
+	{
+		//! The Material values
+		SMaterial Material;
+		//! Which values are taken for override
+		/** OR'ed values from E_MATERIAL_FLAGS. */
+		u32 EnableFlags;
+		//! Set in which render passes the material override is active.
+		/** OR'ed values from E_SCENE_NODE_RENDER_PASS. */
+		u16 EnablePasses;
+		//! Global enable flag, overwritten by the SceneManager in each pass
+		/** The Scenemanager uses the EnablePass array and sets Enabled to
+		true if the Override material is enabled in the current pass. */
+		bool Enabled;
+
+		//! Default constructor
+		SOverrideMaterial() : EnableFlags(0), EnablePasses(0), Enabled(false) {}
+
+		//! Apply the enabled overrides
+		void apply(SMaterial& material)
+		{
+			if (Enabled)
+			{
+				for (u32 i=0; i<32; ++i)
+				{
+					const u32 num=(1<<i);
+					if (EnableFlags & num)
+					{
+						switch (num)
+						{
+						case EMF_WIREFRAME: material.Wireframe = Material.Wireframe; break;
+						case EMF_POINTCLOUD: material.PointCloud = Material.PointCloud; break;
+						case EMF_GOURAUD_SHADING: material.GouraudShading = Material.GouraudShading; break;
+						case EMF_LIGHTING: material.Lighting = Material.Lighting; break;
+						case EMF_ZBUFFER: material.ZBuffer = Material.ZBuffer; break;
+						case EMF_ZWRITE_ENABLE: material.ZWriteEnable = Material.ZWriteEnable; break;
+						case EMF_BACK_FACE_CULLING: material.BackfaceCulling = Material.BackfaceCulling; break;
+						case EMF_FRONT_FACE_CULLING: material.FrontfaceCulling = Material.FrontfaceCulling; break;
+						case EMF_BILINEAR_FILTER: material.TextureLayer[0].BilinearFilter = Material.TextureLayer[0].BilinearFilter; break;
+						case EMF_TRILINEAR_FILTER: material.TextureLayer[0].TrilinearFilter = Material.TextureLayer[0].TrilinearFilter; break;
+						case EMF_ANISOTROPIC_FILTER: material.TextureLayer[0].AnisotropicFilter = Material.TextureLayer[0].AnisotropicFilter; break;
+						case EMF_FOG_ENABLE: material.FogEnable = Material.FogEnable; break;
+						case EMF_NORMALIZE_NORMALS: material.NormalizeNormals = Material.NormalizeNormals; break;
+						case EMF_TEXTURE_WRAP:
+							material.TextureLayer[0].TextureWrapU = Material.TextureLayer[0].TextureWrapU;
+							material.TextureLayer[0].TextureWrapV = Material.TextureLayer[0].TextureWrapV;
+							break;
+						case EMF_ANTI_ALIASING: material.AntiAliasing = Material.AntiAliasing; break;
+						case EMF_COLOR_MASK: material.ColorMask = Material.ColorMask; break;
+						case EMF_COLOR_MATERIAL: material.ColorMaterial = Material.ColorMaterial; break;
+						case EMF_USE_MIP_MAPS: material.UseMipMaps = Material.UseMipMaps; break;
+						case EMF_BLEND_OPERATION: material.BlendOperation = Material.BlendOperation; break;
+						case EMF_POLYGON_OFFSET:
+							material.PolygonOffsetDirection = Material.PolygonOffsetDirection;
+							material.PolygonOffsetFactor = Material.PolygonOffsetFactor; break;
+						}
+					}
+				}
+			}
+		}
+
+	};
+
+	struct IRenderTarget
+	{
+		IRenderTarget(ITexture* texture,
+				E_COLOR_PLANE colorMask=ECP_ALL,
+				E_BLEND_FACTOR blendFuncSrc=EBF_ONE,
+				E_BLEND_FACTOR blendFuncDst=EBF_ONE_MINUS_SRC_ALPHA,
+				E_BLEND_OPERATION blendOp=EBO_NONE) :
+			RenderTexture(texture),
+			TargetType(ERT_RENDER_TEXTURE), ColorMask(colorMask),
+			BlendFuncSrc(blendFuncSrc), BlendFuncDst(blendFuncDst),
+			BlendOp(blendOp) {}
+		IRenderTarget(E_RENDER_TARGET target,
+				E_COLOR_PLANE colorMask=ECP_ALL,
+				E_BLEND_FACTOR blendFuncSrc=EBF_ONE,
+				E_BLEND_FACTOR blendFuncDst=EBF_ONE_MINUS_SRC_ALPHA,
+				E_BLEND_OPERATION blendOp=EBO_NONE) :
+			RenderTexture(0),
+			TargetType(target), ColorMask(colorMask),
+			BlendFuncSrc(blendFuncSrc), BlendFuncDst(blendFuncDst),
+			BlendOp(blendOp) {}
+		bool operator!=(const IRenderTarget& other) const
+		{
+			return ((RenderTexture != other.RenderTexture) ||
+				(TargetType != other.TargetType) ||
+				(ColorMask != other.ColorMask) ||
+				(BlendFuncSrc != other.BlendFuncSrc) ||
+				(BlendFuncDst != other.BlendFuncDst) ||
+				(BlendOp != other.BlendOp));
+		}
+		ITexture* RenderTexture;
+		E_RENDER_TARGET TargetType:8;
+		E_COLOR_PLANE ColorMask:8;
+		E_BLEND_FACTOR BlendFuncSrc:4;
+		E_BLEND_FACTOR BlendFuncDst:4;
+		E_BLEND_OPERATION BlendOp:4;
+	};
+
 	//! Interface to driver which is able to perform 2d and 3d graphics functions.
 	/** This interface is one of the most important interfaces of
 	the Irrlicht Engine: All rendering and texture manipulation is done with
@@ -170,10 +259,14 @@ namespace video
 
 		//! Applications must call this method before performing any rendering.
 		/** This method can clear the back- and the z-buffer.
-		\param clearFlag A combination of the E_CLEAR_BUFFER_FLAG bit-flags.
-		\param clearColor The clear color for the color buffer.
-		\param clearDepth The clear value for the depth buffer.
-		\param clearStencil The clear value for the stencil buffer.
+		\param backBuffer Specifies if the back buffer should be
+		cleared, which means that the screen is filled with the color
+		specified. If this parameter is false, the back buffer will
+		not be cleared and the color parameter is ignored.
+		\param zBuffer Specifies if the depth buffer (z buffer) should
+		be cleared. It is not nesesarry to do so if only 2d drawing is
+		used.
+		\param color The color used for back buffer clearing
 		\param videoData Handle of another window, if you want the
 		bitmap to be displayed on another window. If this is an empty
 		element, everything will be displayed in the default window.
@@ -182,29 +275,16 @@ namespace video
 		rectangle of the area to be presented. Set to null to present
 		everything. Note: not implemented in all devices.
 		\return False if failed. */
-		virtual bool beginScene(u16 clearFlag=(u16)(ECBF_COLOR|ECBF_DEPTH), SColor clearColor = SColor(255,0,0,0), f32 clearDepth = 1.f, u8 clearStencil = 0,
-			const SExposedVideoData& videoData=SExposedVideoData(), core::rect<s32>* sourceRect = 0) = 0;
-
-		//! Alternative beginScene implementation. Can't clear stencil buffer, but otherwise identical to other beginScene
-		bool beginScene(bool backBuffer, bool zBuffer, SColor color = SColor(255,0,0,0),
-			const SExposedVideoData& videoData = SExposedVideoData(), core::rect<s32>* sourceRect = 0)
-		{
-			u16 flag = 0;
-
-			if (backBuffer)
-				flag |= ECBF_COLOR;
-
-			if (zBuffer)
-				flag |= ECBF_DEPTH;
-
-			return beginScene(flag, color, 1.f, 0, videoData, sourceRect);
-		}
+		virtual bool beginScene(bool backBuffer=true, bool zBuffer=true,
+				SColor color=SColor(255,0,0,0),
+				const SExposedVideoData& videoData=SExposedVideoData(),
+				core::rect<s32>* sourceRect=0) =0;
 
 		//! Presents the rendered image to the screen.
 		/** Applications must call this method after performing any
 		rendering.
 		\return False if failed and true if succeeded. */
-		virtual bool endScene() = 0;
+		virtual bool endScene() =0;
 
 		//! Queries the features of the driver.
 		/** Returns true if a feature is available
@@ -223,7 +303,7 @@ namespace video
 		/** The following names can be queried for the given types:
 		MaxTextures (int) The maximum number of simultaneous textures supported by the driver. This can be less than the supported number of textures of the driver. Use _IRR_MATERIAL_MAX_TEXTURES_ to adapt the number.
 		MaxSupportedTextures (int) The maximum number of simultaneous textures supported by the fixed function pipeline of the (hw) driver. The actual supported number of textures supported by the engine can be lower.
-		MaxLights (int) Number of hardware lights supported in the fixed function pipeline of the driver, typically 6-8. Use light manager or deferred shading for more.
+		MaxLights (int) Number of hardware lights supported in the fixed function pipieline of the driver, typically 6-8. Use light manager or deferred shading for more.
 		MaxAnisotropy (int) Number of anisotropy levels supported for filtering. At least 1, max is typically at 16 or 32.
 		MaxUserClipPlanes (int) Number of additional clip planes, which can be set by the user via dedicated driver methods.
 		MaxAuxBuffers (int) Special render buffers, which are currently not really usable inside Irrlicht. Only supported by OpenGL
@@ -325,8 +405,7 @@ namespace video
 		//! Creates an empty texture of specified size.
 		/** \param size: Size of the texture.
 		\param name A name for the texture. Later calls to
-		getTexture() with this name will return this texture.
-		The name can _not_ be empty.
+		getTexture() with this name will return this texture
 		\param format Desired color format of the texture. Please note
 		that the driver may choose to create the texture in another
 		color format.
@@ -338,52 +417,23 @@ namespace video
 
 		//! Creates a texture from an IImage.
 		/** \param name A name for the texture. Later calls of
-		getTexture() with this name will return this texture.
-		The name can _not_ be empty.
+		getTexture() with this name will return this texture
 		\param image Image the texture is created from.
-		\param mipmapData Optional pointer to a mipmaps data.
-		If this parameter is not given, the mipmaps are derived from image.
+		\param mipmapData Optional pointer to a set of images which
+		build up the whole mipmap set. Must be images of the same color
+		type as image. If this parameter is not given, the mipmaps are
+		derived from image.
 		\return Pointer to the newly created texture. This pointer
 		should not be dropped. See IReferenceCounted::drop() for more
 		information. */
-		_IRR_DEPRECATED_ ITexture* addTexture(const io::path& name, IImage* image, void* mipmapData)
-		{
-			if (image)
-				image->setMipMapsData(mipmapData, false, true);
-
-			return addTexture(name, image);
-		}
-
-		//! Creates a texture from an IImage.
-		/** \param name A name for the texture. Later calls of
-		getTexture() with this name will return this texture.
-		The name can _not_ be empty.
-		\param image Image the texture is created from.
-		\return Pointer to the newly created texture. This pointer
-		should not be dropped. See IReferenceCounted::drop() for more
-		information. */
-		virtual ITexture* addTexture(const io::path& name, IImage* image) = 0;
-
-		//! Creates a cubemap texture from loaded IImages.
-		/** \param name A name for the texture. Later calls of getTexture() with this name will return this texture.
-		The name can _not_ be empty.
-		\param imagePosX Image (positive X) the texture is created from.
-		\param imageNegX Image (negative X) the texture is created from.
-		\param imagePosY Image (positive Y) the texture is created from.
-		\param imageNegY Image (negative Y) the texture is created from.
-		\param imagePosZ Image (positive Z) the texture is created from.
-		\param imageNegZ Image (negative Z) the texture is created from.
-		\return Pointer to the newly created texture. This pointer should not be dropped. See IReferenceCounted::drop() for more information. */
-		virtual ITexture* addTextureCubemap(const io::path& name, IImage* imagePosX, IImage* imageNegX, IImage* imagePosY,
-			IImage* imageNegY, IImage* imagePosZ, IImage* imageNegZ) = 0;
+		virtual ITexture* addTexture(const io::path& name, IImage* image, void* mipmapData=0) = 0;
 
 		//! Adds a new render target texture to the texture cache.
 		/** \param size Size of the texture, in pixels. Width and
 		height should be a power of two (e.g. 64, 128, 256, 512, ...)
 		and it should not be bigger than the backbuffer, because it
 		shares the zbuffer with the screen buffer.
-		\param name A name for the texture. Later calls of getTexture() with this name will return this texture.
-		The name can _not_ be empty.
+		\param name An optional name for the RTT.
 		\param format The color format of the render target. Floating point formats are supported.
 		\return Pointer to the created texture or 0 if the texture
 		could not be created. This pointer should not be dropped. See
@@ -453,15 +503,6 @@ namespace video
 		actual value of pixels. */
 		virtual u32 getOcclusionQueryResult(scene::ISceneNode* node) const =0;
 
-		//! Create render target.
-		virtual IRenderTarget* addRenderTarget() = 0;
-
-		//! Remove render target.
-		virtual void removeRenderTarget(IRenderTarget* renderTarget) = 0;
-
-		//! Remove all render targets.
-		virtual void removeAllRenderTargets() = 0;
-
 		//! Sets a boolean alpha channel on the texture based on a color key.
 		/** This makes the texture fully transparent at the texels where
 		this color key can be found when using for example draw2DImage
@@ -510,24 +551,6 @@ namespace video
 		information is multiplied.*/
 		virtual void makeNormalMapTexture(video::ITexture* texture, f32 amplitude=1.0f) const =0;
 
-		//! Set a render target.
-		/** This will only work if the driver supports the
-		EVDF_RENDER_TO_TARGET feature, which can be queried with
-		queryFeature(). Please note that you cannot render 3D or 2D
-		geometry with a render target as texture on it when you are rendering
-		the scene into this render target at the same time. It is usually only
-		possible to render into a texture between the
-		IVideoDriver::beginScene() and endScene() method calls. If you need the
-		best performance use this method instead of setRenderTarget.
-		\param target Render target object.
-		\param clearFlag A combination of the E_CLEAR_BUFFER_FLAG bit-flags.
-		\param clearColor The clear color for the color buffer.
-		\param clearDepth The clear value for the depth buffer.
-		\param clearStencil The clear value for the stencil buffer.
-		\return True if successful and false if not. */
-		virtual bool setRenderTargetEx(IRenderTarget* target, u16 clearFlag, SColor clearColor = SColor(255,0,0,0),
-			f32 clearDepth = 1.f, u8 clearStencil = 0) = 0;
-
 		//! Sets a new render target.
 		/** This will only work if the driver supports the
 		EVDF_RENDER_TO_TARGET feature, which can be queried with
@@ -552,29 +575,38 @@ namespace video
 		IVideoDriver::addRenderTargetTexture(). If set to 0, it sets
 		the previous render target which was set before the last
 		setRenderTarget() call.
-		\param clearFlag A combination of the E_CLEAR_BUFFER_FLAG bit-flags.
-		\param clearColor The clear color for the color buffer.
-		\param clearDepth The clear value for the depth buffer.
-		\param clearStencil The clear value for the stencil buffer.
-		\return True if successful and false if not. */
-		virtual bool setRenderTarget(ITexture* texture, u16 clearFlag=ECBF_COLOR|ECBF_DEPTH, SColor clearColor = SColor(255,0,0,0),
-			f32 clearDepth = 1.f, u8 clearStencil = 0) = 0;
+		\param clearBackBuffer Clears the backbuffer of the render
+		target with the color parameter
+		\param clearZBuffer Clears the zBuffer of the rendertarget.
+		Note that because the frame buffer may share the zbuffer with
+		the rendertarget, its zbuffer might be partially cleared too
+		by this.
+		\param color The background color for the render target.
+		\return True if sucessful and false if not. */
+		virtual bool setRenderTarget(video::ITexture* texture,
+			bool clearBackBuffer=true, bool clearZBuffer=true,
+			SColor color=video::SColor(0,0,0,0)) =0;
 
-		//! Sets a new render target.
-		//! Prefer to use the setRenderTarget function taking flags as parameter as this one can't clear the stencil buffer.
-		//! It's still offered for backward compatibility.
-		bool setRenderTarget(ITexture* texture, bool clearBackBuffer, bool clearZBuffer, SColor color = SColor(255,0,0,0))
-		{
-			u16 flag = 0;
+		//! set or reset special render targets
+		/** This method enables access to special color buffers such as
+		stereoscopic buffers or auxiliary buffers.
+		\param target Enum value for the render target
+		\param clearTarget Clears the target buffer with the color
+		parameter
+		\param clearZBuffer Clears the zBuffer of the rendertarget.
+		Note that because the main frame buffer may share the zbuffer with
+		the rendertarget, its zbuffer might be partially cleared too
+		by this.
+		\param color The background color for the render target.
+		\return True if sucessful and false if not. */
+		virtual bool setRenderTarget(E_RENDER_TARGET target, bool clearTarget=true,
+					bool clearZBuffer=true,
+					SColor color=video::SColor(0,0,0,0)) =0;
 
-			if (clearBackBuffer)
-				flag |= ECBF_COLOR;
-
-			if (clearZBuffer)
-				flag |= ECBF_DEPTH;
-
-			return setRenderTarget(texture, flag, color);
-		}
+		//! Sets new multiple render targets.
+		virtual bool setRenderTarget(const core::array<video::IRenderTarget>& texture,
+			bool clearBackBuffer=true, bool clearZBuffer=true,
+			SColor color=video::SColor(0,0,0,0)) =0;
 
 		//! Sets a new viewport.
 		/** Every rendering operation is done into this new area.
@@ -906,11 +938,8 @@ namespace video
 		virtual void draw2DRectangleOutline(const core::recti& pos,
 				SColor color=SColor(255,255,255,255)) =0;
 
-		//! Draws a 2d line.
-		/** In theory both start and end will be included in coloring.
-		BUG: Currently hardware drivers (d3d/opengl) ignore the last pixel
-		(they use the so called "diamond exit rule" for drawing lines).
-		\param start Screen coordinates of the start of the line
+		//! Draws a 2d line. Both start and end will be included in coloring.
+		/** \param start Screen coordinates of the start of the line
 		in pixels.
 		\param end Screen coordinates of the start of the line in
 		pixels.
@@ -1127,28 +1156,6 @@ namespace video
 		\return The current texture creation flag enabled mode. */
 		virtual bool getTextureCreationFlag(E_TEXTURE_CREATION_FLAG flag) const =0;
 
-		//! Creates a software images from a file.
-		/** No hardware texture will be created for those images. This
-		method is useful for example if you want to read a heightmap
-		for a terrain renderer.
-		\param filename Name of the file from which the images are created.
-		\param type Pointer to E_TEXTURE_TYPE where a recommended type of the texture will be stored.
-		\return The array of created images.
-		If you no longer need those images, you should call IImage::drop() on each of them.
-		See IReferenceCounted::drop() for more information. */
-		virtual core::array<IImage*> createImagesFromFile(const io::path& filename, E_TEXTURE_TYPE* type = 0) = 0;
-
-		//! Creates a software images from a file.
-		/** No hardware texture will be created for those images. This
-		method is useful for example if you want to read a heightmap
-		for a terrain renderer.
-		\param file File from which the image is created.
-		\param type Pointer to E_TEXTURE_TYPE where a recommended type of the texture will be stored.
-		\return The array of created images.
-		If you no longer need those images, you should call IImage::drop() on each of them.
-		See IReferenceCounted::drop() for more information. */
-		virtual core::array<IImage*> createImagesFromFile(io::IReadFile* file, E_TEXTURE_TYPE* type = 0) = 0;
-
 		//! Creates a software image from a file.
 		/** No hardware texture will be created for this image. This
 		method is useful for example if you want to read a heightmap
@@ -1158,15 +1165,7 @@ namespace video
 		\return The created image.
 		If you no longer need the image, you should call IImage::drop().
 		See IReferenceCounted::drop() for more information. */
-		IImage* createImageFromFile(const io::path& filename)
-		{
-			core::array<IImage*> imageArray = createImagesFromFile(filename);
-
-			for (u32 i = 1; i < imageArray.size(); ++i)
-				imageArray[i]->drop();
-
-			return (imageArray.size() > 0) ? imageArray[0] : 0;
-		}
+		virtual IImage* createImageFromFile(const io::path& filename) = 0;
 
 		//! Creates a software image from a file.
 		/** No hardware texture will be created for this image. This
@@ -1176,15 +1175,7 @@ namespace video
 		\return The created image.
 		If you no longer need the image, you should call IImage::drop().
 		See IReferenceCounted::drop() for more information. */
-		IImage* createImageFromFile(io::IReadFile* file)
-		{
-			core::array<IImage*> imageArray = createImagesFromFile(file);
-
-			for (u32 i = 1; i < imageArray.size(); ++i)
-				imageArray[i]->drop();
-
-			return (imageArray.size() > 0) ? imageArray[0] : 0;
-		}
+		virtual IImage* createImageFromFile(io::IReadFile* file) =0;
 
 		//! Writes the provided image to a file.
 		/** Requires that there is a suitable image writer registered
@@ -1215,7 +1206,7 @@ namespace video
 		\param size Desired size of the image
 		\param data A byte array with pixel color information
 		\param ownForeignMemory If true, the image will use the data
-		pointer directly and own it afterward. If false, the memory
+		pointer directly and own it afterwards. If false, the memory
 		will by copied internally.
 		\param deleteMemory Whether the memory is deallocated upon
 		destruction.
@@ -1223,8 +1214,9 @@ namespace video
 		If you no longer need the image, you should call IImage::drop().
 		See IReferenceCounted::drop() for more information. */
 		virtual IImage* createImageFromData(ECOLOR_FORMAT format,
-			const core::dimension2d<u32>& size, void *data, bool ownForeignMemory = false,
-			bool deleteMemory = true) = 0;
+			const core::dimension2d<u32>& size, void *data,
+			bool ownForeignMemory=false,
+			bool deleteMemory = true) =0;
 
 		//! Creates an empty software image.
 		/**
@@ -1291,7 +1283,7 @@ namespace video
 		\param name Optional name for the material renderer entry.
 		\return The number of the material type which can be set in
 		SMaterial::MaterialType to use the renderer. -1 is returned if
-		an error occurred. For example if you tried to add an material
+		an error occured. For example if you tried to add an material
 		renderer to the software renderer or the null device, which do
 		not accept material renderers. */
 		virtual s32 addMaterialRenderer(IMaterialRenderer* renderer, const c8* name =0) =0;
@@ -1368,26 +1360,6 @@ namespace video
 		//! Returns a pointer to the mesh manipulator.
 		virtual scene::IMeshManipulator* getMeshManipulator() =0;
 
-		//! Clear the color, depth and/or stencil buffers.
-		virtual void clearBuffers(u16 flag, SColor color = SColor(255,0,0,0), f32 depth = 1.f, u8 stencil = 0) = 0;
-
-		//! Clear the color, depth and/or stencil buffers.
-		_IRR_DEPRECATED_ void clearBuffers(bool backBuffer, bool depthBuffer, bool stencilBuffer, SColor color)
-		{
-			u16 flag = 0;
-
-			if (backBuffer)
-				flag |= ECBF_COLOR;
-
-			if (depthBuffer)
-				flag |= ECBF_DEPTH;
-
-			if (stencilBuffer)
-				flag |= ECBF_STENCIL;
-
-			clearBuffers(flag, color);
-		}
-
 		//! Clears the ZBuffer.
 		/** Note that you usually need not to call this method, as it
 		is automatically done in IVideoDriver::beginScene() or
@@ -1395,10 +1367,7 @@ namespace video
 		you have to render some special things, you can clear the
 		zbuffer during the rendering process with this method any time.
 		*/
-		_IRR_DEPRECATED_ void clearZBuffer()
-		{
-			clearBuffers(ECBF_DEPTH, SColor(255,0,0,0), 1.f, 0);
-		}
+		virtual void clearZBuffer() =0;
 
 		//! Make a screenshot of the last rendered frame.
 		/** \return An image created from the last rendered frame. */
@@ -1443,7 +1412,7 @@ namespace video
 		virtual SOverrideMaterial& getOverrideMaterial() =0;
 
 		//! Get the 2d override material for altering its values
-		/** The 2d override material allows to alter certain render
+		/** The 2d override materual allows to alter certain render
 		states of the 2d methods. Not all members of SMaterial are
 		honored, especially not MaterialType and Textures. Moreover,
 		the zbuffer is always ignored, and lighting is always off. All
@@ -1493,10 +1462,6 @@ namespace video
 		*/
 		virtual void convertColor(const void* sP, ECOLOR_FORMAT sF, s32 sN,
 				void* dP, ECOLOR_FORMAT dF) const =0;
-
-		//! Check if the driver supports creating textures with the given color format
-		/**	\return True if the format is available, false if not. */
-		virtual bool queryTextureFormat(ECOLOR_FORMAT format) const = 0;
 	};
 
 } // end namespace video

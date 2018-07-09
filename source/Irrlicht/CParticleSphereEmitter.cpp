@@ -2,10 +2,8 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
+#include "IrrCompileConfig.h"
 #include "CParticleSphereEmitter.h"
-
-#ifdef _IRR_COMPILE_WITH_PARTICLES_
-
 #include "os.h"
 #include "IAttributes.h"
 
@@ -29,7 +27,7 @@ CParticleSphereEmitter::CParticleSphereEmitter(
 	MaxParticlesPerSecond(maxParticlesPerSecond),
 	MinStartColor(minStartColor), MaxStartColor(maxStartColor),
 	MinLifeTime(lifeTimeMin), MaxLifeTime(lifeTimeMax),
-	Time(0), MaxAngleDegrees(maxAngleDegrees)
+	Time(0), Emitted(0), MaxAngleDegrees(maxAngleDegrees)
 {
 	#ifdef _DEBUG
 	setDebugName("CParticleSphereEmitter");
@@ -120,7 +118,7 @@ void CParticleSphereEmitter::serializeAttributes(io::IAttributes* out, io::SAttr
 	out->addFloat("MinStartSizeWidth", MinStartSize.Width);
 	out->addFloat("MinStartSizeHeight", MinStartSize.Height);
 	out->addFloat("MaxStartSizeWidth", MaxStartSize.Width);
-	out->addFloat("MaxStartSizeHeight", MaxStartSize.Height);
+	out->addFloat("MaxStartSizeHeight", MaxStartSize.Height); 
 	out->addInt("MinParticlesPerSecond", MinParticlesPerSecond);
 	out->addInt("MaxParticlesPerSecond", MaxParticlesPerSecond);
 	out->addColor("MinStartColor", MinStartColor);
@@ -152,7 +150,7 @@ void CParticleSphereEmitter::deserializeAttributes(io::IAttributes* in, io::SAtt
 		MaxStartSize.Width = in->getAttributeAsFloat(idx);
 	idx = in->findAttribute("MaxStartSizeHeight");
 	if ( idx >= 0 )
-		MaxStartSize.Height = in->getAttributeAsFloat(idx);
+		MaxStartSize.Height = in->getAttributeAsFloat(idx); 
 	MinParticlesPerSecond = in->getAttributeAsInt("MinParticlesPerSecond");
 	MaxParticlesPerSecond = in->getAttributeAsInt("MaxParticlesPerSecond");
 
@@ -175,4 +173,3 @@ void CParticleSphereEmitter::deserializeAttributes(io::IAttributes* in, io::SAtt
 } // end namespace scene
 } // end namespace irr
 
-#endif // _IRR_COMPILE_WITH_PARTICLES_

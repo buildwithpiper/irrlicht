@@ -40,7 +40,7 @@ public:
 		u32 Minute;
 		// Second of the minute, due to extra seconds from 0 to 61
 		u32 Second;
-		// Year of the Gregorian calender
+		// Year of the gregorian calender
 		s32 Year;
 		// Month of the year, from 1 to 12
 		u32 Month;
@@ -51,7 +51,7 @@ public:
 		// Day of the year, from 1 to 366
 		u32 Yearday;
 		// Whether daylight saving is on
-		bool IsDST;
+		bool IsDST;		
 	};
 
 	virtual RealTimeDate getRealTimeAndDate() const = 0;

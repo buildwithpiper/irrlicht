@@ -15,10 +15,6 @@ namespace video
 {
 	class IVideoDriver;
 }
-namespace io
-{
-	class IFileSystem;
-}
 
 namespace scene
 {
@@ -28,16 +24,18 @@ class CSMFMeshFileLoader : public virtual IMeshLoader
 {
 public:
 
-	CSMFMeshFileLoader(irr::io::IFileSystem* fs, video::IVideoDriver* driver);
+	CSMFMeshFileLoader(video::IVideoDriver* driver);
 
 	//! Returns true if the file might be loaded by this class.
-	virtual bool isALoadableFileExtension(const io::path& filename) const _IRR_OVERRIDE_;
+	virtual bool isALoadableFileExtension(const io::path& filename) const;
 
 	//! Creates/loads an animated mesh from the file.
-	virtual IAnimatedMesh* createMesh(io::IReadFile* file) _IRR_OVERRIDE_;
+	virtual IAnimatedMesh* createMesh(io::IReadFile* file);
 private:
 
 	void loadLimb(io::IReadFile* file, scene::SMesh* mesh, const core::matrix4 &parentTransformation);
+
+	video::IVideoDriver* Driver;
 };
 
 } // end namespace scene

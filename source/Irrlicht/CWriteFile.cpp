@@ -41,12 +41,12 @@ inline bool CWriteFile::isOpen() const
 
 
 //! returns how much was read
-size_t CWriteFile::write(const void* buffer, size_t sizeToWrite)
+s32 CWriteFile::write(const void* buffer, u32 sizeToWrite)
 {
 	if (!isOpen())
 		return 0;
 
-	return fwrite(buffer, 1, sizeToWrite, File);
+	return (s32)fwrite(buffer, 1, sizeToWrite, File);
 }
 
 
@@ -105,16 +105,9 @@ const io::path& CWriteFile::getFileName() const
 	return Filename;
 }
 
-//! Flush the content of the buffer in the file
-bool CWriteFile::flush()
-{
-	if (!isOpen())
-		return false;
 
-	return fflush(File) == 0; // 0 indicates success, otherwise EOF and errno is set
-}
 
-IWriteFile* CWriteFile::createWriteFile(const io::path& fileName, bool append)
+IWriteFile* createWriteFile(const io::path& fileName, bool append)
 {
 	CWriteFile* file = new CWriteFile(fileName, append);
 	if (file->isOpen())

@@ -3,10 +3,6 @@
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
 #include "CParticleRotationAffector.h"
-
-#include "IrrCompileConfig.h"
-#ifdef _IRR_COMPILE_WITH_PARTICLES_
-
 #include "IAttributes.h"
 
 namespace irr
@@ -69,4 +65,3 @@ void CParticleRotationAffector::deserializeAttributes(io::IAttributes* in, io::S
 } // end namespace scene
 } // end namespace irr
 
-#endif // _IRR_COMPILE_WITH_PARTICLES_

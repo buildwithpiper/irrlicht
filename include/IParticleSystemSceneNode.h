@@ -23,7 +23,7 @@ namespace irr
 namespace scene
 {
 
-//! A particle system scene node for creating snow, fire, explosions, smoke...
+//! A particle system scene node for creating snow, fire, exlosions, smoke...
 /** A scene node controlling a particle System. The behavior of the particles
 can be controlled by setting the right particle emitters and affectors.
 You can for example easily create a campfire by doing this:
@@ -41,33 +41,8 @@ You can for example easily create a campfire by doing this:
 	p->addAffector(paf);
 	paf->drop();
 \endcode
+
 */
-
-//! Bitflags to control particle behavior
-enum EParticleBehavior
-{
-	//! Continue emitting new particles even when the node is invisible
-	EPB_INVISIBLE_EMITTING = 1,
-
-	//! Continue affecting particles even when the node is invisible
-	EPB_INVISIBLE_AFFECTING = 2,
-
-	//! Continue updating particle positions or deleting them even when the node is invisible
-	EPB_INVISIBLE_ANIMATING = 4,
-
-	//! Clear all particles when node gets invisible
-	EPB_CLEAR_ON_INVISIBLE = 8,
-
-	//! Particle movement direction on emitting ignores the node rotation
-	//! This is mainly to allow backward compatible behavior to Irrlicht 1.8
-	EPB_EMITTER_VECTOR_IGNORE_ROTATION = 16,
-
-	//! On emitting global particles interpolate the positions randomly between the last and current node transformations.
-	//! This can be set to avoid gaps caused by fast node movement or low framerates, but will be somewhat
-	//! slower to calculate.
-	EPB_EMITTER_FRAME_INTERPOLATION = 32
-};
-
 class IParticleSystemSceneNode : public ISceneNode
 {
 public:
@@ -77,10 +52,7 @@ public:
 		const core::vector3df& position = core::vector3df(0,0,0),
 		const core::vector3df& rotation = core::vector3df(0,0,0),
 		const core::vector3df& scale = core::vector3df(1.0f, 1.0f, 1.0f))
-			: ISceneNode(parent, mgr, id, position, rotation, scale)
-			, ParticleBehavior(0)
-	{
-	}
+			: ISceneNode(parent, mgr, id, position, rotation, scale) {}
 
 	//! Sets the size of all particles.
 	virtual void setParticleSize(
@@ -92,31 +64,12 @@ public:
 	Default is true. */
 	virtual void setParticlesAreGlobal(bool global=true) = 0;
 
-
-	//! Bitflags to change the particle behavior
-	/**
-	\param flags A combination of ::EParticleBehavior bit-flags. Default is 0.	*/
-	virtual void setParticleBehavior(irr::u32 flags)
-	{
-		ParticleBehavior = flags;
-	}
-
-
-	//! Gets how particles behave in different situations
-	/**
-	\return A combination of ::EParticleBehavior flags */
-	virtual irr::u32 getParticleBehavior() const
-	{
-		return ParticleBehavior;
-	}
-
 	//! Remove all currently visible particles
 	virtual void clearParticles() = 0;
 
 	//! Do manually update the particles.
-	/** This should only be called when you want to render the node outside
-	the scenegraph, as the node will care about this otherwise
-	automatically. */
+ 	//! This should only be called when you want to render the node outside the scenegraph,
+ 	//! as the node will care about this otherwise automatically.
 	virtual void doParticleSystem(u32 time) = 0;
 
 	//! Gets the particle emitter, which creates the particles.
@@ -196,7 +149,7 @@ public:
 	\return Pointer to the created particle emitter. To set this emitter
 	as new emitter of this particle system, just call setEmitter(). Note
 	that you'll have to drop() the returned pointer, after you don't need
-	it any more, see IReferenceCounted::drop() for more information. */
+	it any more, see IReferenceCounted::drop() for more informations. */
 	virtual IParticleAnimatedMeshSceneNodeEmitter* createAnimatedMeshSceneNodeEmitter(
 		scene::IAnimatedMeshSceneNode* node, bool useNormalDirection = true,
 		const core::vector3df& direction = core::vector3df(0.0f,0.03f,0.0f),
@@ -236,7 +189,7 @@ public:
 	\return Pointer to the created particle emitter. To set this emitter
 	as new emitter of this particle system, just call setEmitter(). Note
 	that you'll have to drop() the returned pointer, after you don't need
-	it any more, see IReferenceCounted::drop() for more information. */
+	it any more, see IReferenceCounted::drop() for more informations. */
 	virtual IParticleBoxEmitter* createBoxEmitter(
 		const core::aabbox3df& box = core::aabbox3df(-10,28,-10,10,30,10),
 		const core::vector3df& direction = core::vector3df(0.0f,0.03f,0.0f),
@@ -280,7 +233,7 @@ public:
 	\return Pointer to the created particle emitter. To set this emitter
 	as new emitter of this particle system, just call setEmitter(). Note
 	that you'll have to drop() the returned pointer, after you don't need
-	it any more, see IReferenceCounted::drop() for more information. */
+	it any more, see IReferenceCounted::drop() for more informations. */
 	virtual IParticleCylinderEmitter* createCylinderEmitter(
 		const core::vector3df& center, f32 radius,
 		const core::vector3df& normal, f32 length,
@@ -336,7 +289,7 @@ public:
 	\return Pointer to the created particle emitter. To set this emitter
 	as new emitter of this particle system, just call setEmitter(). Note
 	that you'll have to drop() the returned pointer, after you don't need
-	it any more, see IReferenceCounted::drop() for more information. */
+	it any more, see IReferenceCounted::drop() for more informations. */
 	virtual IParticleMeshEmitter* createMeshEmitter(
 		scene::IMesh* mesh, bool useNormalDirection = true,
 		const core::vector3df& direction = core::vector3df(0.0f,0.03f,0.0f),
@@ -375,7 +328,7 @@ public:
 	\return Pointer to the created particle emitter. To set this emitter
 	as new emitter of this particle system, just call setEmitter(). Note
 	that you'll have to drop() the returned pointer, after you don't need
-	it any more, see IReferenceCounted::drop() for more information. */
+	it any more, see IReferenceCounted::drop() for more informations. */
 	virtual IParticlePointEmitter* createPointEmitter(
 		const core::vector3df& direction = core::vector3df(0.0f,0.03f,0.0f),
 		u32 minParticlesPerSecond = 5,
@@ -417,7 +370,7 @@ public:
 	\return Pointer to the created particle emitter. To set this emitter
 	as new emitter of this particle system, just call setEmitter(). Note
 	that you'll have to drop() the returned pointer, after you don't need
-	it any more, see IReferenceCounted::drop() for more information. */
+	it any more, see IReferenceCounted::drop() for more informations. */
 	virtual IParticleRingEmitter* createRingEmitter(
 		const core::vector3df& center, f32 radius, f32 ringThickness,
 		const core::vector3df& direction = core::vector3df(0.0f,0.03f,0.0f),
@@ -457,7 +410,7 @@ public:
 	\return Pointer to the created particle emitter. To set this emitter
 	as new emitter of this particle system, just call setEmitter(). Note
 	that you'll have to drop() the returned pointer, after you don't need
-	it any more, see IReferenceCounted::drop() for more information. */
+	it any more, see IReferenceCounted::drop() for more informations. */
 	virtual IParticleSphereEmitter* createSphereEmitter(
 		const core::vector3df& center, f32 radius,
 		const core::vector3df& direction = core::vector3df(0.0f,0.03f,0.0f),
@@ -487,7 +440,7 @@ public:
 	\return Pointer to the created particle affector. To add this affector
 	as new affector of this particle system, just call addAffector(). Note
 	that you'll have to drop() the returned pointer, after you don't need
-	it any more, see IReferenceCounted::drop() for more information. */
+	it any more, see IReferenceCounted::drop() for more informations. */
 	virtual IParticleAttractionAffector* createAttractionAffector(
 		const core::vector3df& point, f32 speed = 1.0f, bool attract = true,
 		bool affectX = true, bool affectY = true, bool affectZ = true) = 0;
@@ -510,12 +463,12 @@ public:
 	targetColor is video::SColor(0,0,0,0): Particles are fading out into
 	void with this setting.
 	\param targetColor: Color whereto the color of the particle is changed.
-	\param timeNeededToFadeOut: How much time in milliseconds should the
+	\param timeNeededToFadeOut: How much time in milli seconds should the
 	affector need to change the color to the targetColor.
 	\return Pointer to the created particle affector. To add this affector
 	as new affector of this particle system, just call addAffector(). Note
 	that you'll have to drop() the returned pointer, after you don't need
-	it any more, see IReferenceCounted::drop() for more information. */
+	it any more, see IReferenceCounted::drop() for more informations. */
 	virtual IParticleFadeOutAffector* createFadeOutParticleAffector(
 		const video::SColor& targetColor = video::SColor(0,0,0,0),
 		u32 timeNeededToFadeOut = 1000) = 0;
@@ -523,16 +476,16 @@ public:
 	//! Creates a gravity affector.
 	/** This affector modifies the direction of the particle. It assumes
 	that the particle is fired out of the emitter with huge force, but is
-	loosing this after some time and is caught by the gravity then. This
+	loosing this after some time and is catched by the gravity then. This
 	affector is ideal for creating things like fountains.
 	\param gravity: Direction and force of gravity.
-	\param timeForceLost: Time in milliseconds when the force of the
+	\param timeForceLost: Time in milli seconds when the force of the
 	emitter is totally lost and the particle does not move any more. This
 	is the time where gravity fully affects the particle.
 	\return Pointer to the created particle affector. To add this affector
 	as new affector of this particle system, just call addAffector(). Note
 	that you'll have to drop() the returned pointer, after you don't need
-	it any more, see IReferenceCounted::drop() for more information. */
+	it any more, see IReferenceCounted::drop() for more informations. */
 	virtual IParticleGravityAffector* createGravityAffector(
 		const core::vector3df& gravity = core::vector3df(0.0f,-0.03f,0.0f),
 		u32 timeForceLost = 1000) = 0;
@@ -545,28 +498,15 @@ public:
 	\return Pointer to the created particle affector. To add this affector
 	as new affector of this particle system, just call addAffector(). Note
 	that you'll have to drop() the returned pointer, after you don't need
-	it any more, see IReferenceCounted::drop() for more information. */
+	it any more, see IReferenceCounted::drop() for more informations. */
 	virtual IParticleRotationAffector* createRotationAffector(
 		const core::vector3df& speed = core::vector3df(5.0f,5.0f,5.0f),
 		const core::vector3df& pivotPoint = core::vector3df(0.0f,0.0f,0.0f) ) = 0;
-
-	//! Writes attributes of the scene node.
-	virtual void serializeAttributes(io::IAttributes* out, io::SAttributeReadWriteOptions* options) const _IRR_OVERRIDE_
-	{
-		out->addInt("ParticleBehavior", ParticleBehavior);
-	}
-
-	//! Reads attributes of the scene node.
-	virtual void deserializeAttributes(io::IAttributes* in, io::SAttributeReadWriteOptions* options) _IRR_OVERRIDE_
-	{
-		ParticleBehavior = in->getAttributeAsInt("ParticleBehavior", ParticleBehavior);
-	}
-
-protected:
-	s32 ParticleBehavior;
 };
 
 } // end namespace scene
 } // end namespace irr
 
+
 #endif
+

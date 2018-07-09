@@ -3,9 +3,6 @@
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
 #include "CParticleAttractionAffector.h"
-
-#ifdef _IRR_COMPILE_WITH_PARTICLES_
-
 #include "IAttributes.h"
 
 namespace irr
@@ -85,4 +82,3 @@ void CParticleAttractionAffector::deserializeAttributes(io::IAttributes* in, io:
 } // end namespace scene
 } // end namespace irr
 
-#endif // _IRR_COMPILE_WITH_PARTICLES_

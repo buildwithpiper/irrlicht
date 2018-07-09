@@ -7,7 +7,6 @@
 #ifdef _IRR_COMPILE_WITH_X_LOADER_
 
 #include "CXMeshFileLoader.h"
-#include "CMeshTextureLoader.h"
 #include "os.h"
 
 #include "fast_atof.h"
@@ -29,15 +28,13 @@ namespace scene
 
 //! Constructor
 CXMeshFileLoader::CXMeshFileLoader(scene::ISceneManager* smgr, io::IFileSystem* fs)
-: SceneManager(smgr), FileSystem(fs), AnimatedMesh(0),
+: SceneManager(smgr), FileSystem(fs), AllJoints(0), AnimatedMesh(0),
 	Buffer(0), P(0), End(0), BinaryNumCount(0), Line(0),
 	CurFrame(0), MajorVersion(0), MinorVersion(0), BinaryFormat(false), FloatSize(0)
 {
 	#ifdef _DEBUG
 	setDebugName("CXMeshFileLoader");
 	#endif
-
-	TextureLoader = new CMeshTextureLoader( FileSystem, SceneManager->getVideoDriver() );
 }
 
 
@@ -53,13 +50,10 @@ bool CXMeshFileLoader::isALoadableFileExtension(const io::path& filename) const
 //! \return Pointer to the created mesh. Returns 0 if loading failed.
 //! If you no longer need the mesh, you should call IAnimatedMesh::drop().
 //! See IReferenceCounted::drop() for more information.
-IAnimatedMesh* CXMeshFileLoader::createMesh(io::IReadFile* file)
+IAnimatedMesh* CXMeshFileLoader::createMesh(io::IReadFile* f)
 {
-	if (!file)
+	if (!f)
 		return 0;
-
-	if ( getMeshTextureLoader() )
-		getMeshTextureLoader()->setMeshFile(file);
 
 #ifdef _XREADER_DEBUG
 	u32 time = os::Timer::getRealTime();
@@ -67,7 +61,7 @@ IAnimatedMesh* CXMeshFileLoader::createMesh(io::IReadFile* file)
 
 	AnimatedMesh = new CSkinnedMesh();
 
-	if (load(file))
+	if (load(f))
 	{
 		AnimatedMesh->finalize();
 	}
@@ -411,7 +405,7 @@ bool CXMeshFileLoader::readFileIntoMemory(io::IReadFile* file)
 	Buffer = new c8[size];
 
 	//! read all into memory
-	if (file->read(Buffer, size) != static_cast<size_t>(size))
+	if (file->read(Buffer, size) != size)
 	{
 		os::Printer::log("Could not read from x file.", ELL_WARNING);
 		return false;
@@ -464,6 +458,7 @@ bool CXMeshFileLoader::readFileIntoMemory(io::IReadFile* file)
 	P = &Buffer[16];
 
 	readUntilEndOfLine();
+	FilePath = FileSystem->getFileDir(file->getFileName()) + "/";
 
 	return true;
 }
@@ -518,11 +513,6 @@ bool CXMeshFileLoader::parseDataObject()
 	if (objectName == "AnimationSet")
 	{
 		return parseDataObjectAnimationSet();
-	}
-	else
-	if (objectName == "AnimTicksPerSecond")
-	{
-		return parseDataObjectAnimationTicksPerSecond();
 	}
 	else
 	if (objectName == "Material")
@@ -883,12 +873,6 @@ bool CXMeshFileLoader::parseDataObjectMesh(SXMesh &mesh)
 		else
 		if (objectName == "DeclData")
 		{
-			if (!readHeadOfDataObject())
-			{
-				os::Printer::log("No starting brace in DeclData found.", ELL_WARNING);
-				os::Printer::log("Line", core::stringc(Line).c_str(), ELL_WARNING);
-				return false;
-			}
 			// arbitrary vertex attributes
 			// first comes the number of element definitions
 			// then the vertex element type definitions
@@ -1540,8 +1524,19 @@ bool CXMeshFileLoader::parseDataObjectMaterial(video::SMaterial& material)
 			if (!parseDataObjectTextureFilename(TextureFileName))
 				return false;
 
-			material.setTexture( textureLayer, getMeshTextureLoader() ? getMeshTextureLoader()->getTexture(TextureFileName) : NULL );
-
+			// original name
+			if (FileSystem->existFile(TextureFileName))
+				material.setTexture(textureLayer, SceneManager->getVideoDriver()->getTexture(TextureFileName));
+			// mesh path
+			else
+			{
+				TextureFileName=FilePath + FileSystem->getFileBasename(TextureFileName);
+				if (FileSystem->existFile(TextureFileName))
+					material.setTexture(textureLayer, SceneManager->getVideoDriver()->getTexture(TextureFileName));
+				// working directory
+				else
+					material.setTexture(textureLayer, SceneManager->getVideoDriver()->getTexture(FileSystem->getFileBasename(TextureFileName)));
+			}
 			++textureLayer;
 			if (textureLayer==2)
 				material.MaterialType=video::EMT_LIGHTMAP;
@@ -1554,8 +1549,19 @@ bool CXMeshFileLoader::parseDataObjectMaterial(video::SMaterial& material)
 			if (!parseDataObjectTextureFilename(TextureFileName))
 				return false;
 
-			material.setTexture( 1, getMeshTextureLoader() ? getMeshTextureLoader()->getTexture(TextureFileName) : NULL );
-
+			// original name
+			if (FileSystem->existFile(TextureFileName))
+				material.setTexture(1, SceneManager->getVideoDriver()->getTexture(TextureFileName));
+			// mesh path
+			else
+			{
+				TextureFileName=FilePath + FileSystem->getFileBasename(TextureFileName);
+				if (FileSystem->existFile(TextureFileName))
+					material.setTexture(1, SceneManager->getVideoDriver()->getTexture(TextureFileName));
+				// working directory
+				else
+					material.setTexture(1, SceneManager->getVideoDriver()->getTexture(FileSystem->getFileBasename(TextureFileName)));
+			}
 			if (textureLayer==1)
 				++textureLayer;
 		}
@@ -1618,39 +1624,6 @@ bool CXMeshFileLoader::parseDataObjectAnimationSet()
 	return true;
 }
 
-bool CXMeshFileLoader::parseDataObjectAnimationTicksPerSecond()
-{
-#ifdef _XREADER_DEBUG
-	os::Printer::log("CXFileReader: reading AnimationTicksPerSecond", ELL_DEBUG);
-#endif
-
-	if (!readHeadOfDataObject())
-	{
-		os::Printer::log("No opening brace in Animation found in x file", ELL_WARNING);
-		os::Printer::log("Line", core::stringc(Line).c_str(), ELL_WARNING);
-		return false;
-	}
-
-	const u32 ticks = readInt();
-
-	if (!checkForOneFollowingSemicolons())
-	{
-		os::Printer::log("No closing semicolon in AnimationTicksPerSecond in x file", ELL_WARNING);
-		os::Printer::log("Line", core::stringc(Line).c_str(), ELL_WARNING);
-		return false;
-	}
-
-	if (!checkForClosingBrace())
-	{
-		os::Printer::log("No closing brace in AnimationTicksPerSecond in x file", ELL_WARNING);
-		os::Printer::log("Line", core::stringc(Line).c_str(), ELL_WARNING);
-		return false;
-	}
-
-	AnimatedMesh->setAnimationSpeed(static_cast<irr::f32>(ticks));
-
-	return true;
-}
 
 bool CXMeshFileLoader::parseDataObjectAnimation()
 {
@@ -1906,8 +1879,8 @@ bool CXMeshFileLoader::parseDataObjectAnimationKey(ISkinnedMesh::SJoint *joint)
 				ISkinnedMesh::SRotationKey *keyR=AnimatedMesh->addRotationKey(joint);
 				keyR->frame=time;
 
-				// IRR_TEST_BROKEN_QUATERNION_USE: TODO - switched from mat to mat.getTransposed() for downward compatibility.
-				// Not tested so far if this was correct or wrong before quaternion fix!
+				// IRR_TEST_BROKEN_QUATERNION_USE: TODO - switched from mat to mat.getTransposed() for downward compatibility. 
+				//								   Not tested so far if this was correct or wrong before quaternion fix!
 				keyR->rotation= core::quaternion(mat.getTransposed());
 
 				ISkinnedMesh::SPositionKey *keyP=AnimatedMesh->addPositionKey(joint);

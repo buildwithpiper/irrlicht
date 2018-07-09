@@ -66,7 +66,7 @@ public:
 
 	//! Reads forward to the next xml node.
 	//! \return Returns false, if there was no further node.
-	virtual bool read() _IRR_OVERRIDE_
+	virtual bool read()
 	{
 		// if not end reached, parse the node
 		if (P && ((unsigned int)(P - TextBegin) < TextSize - 1) && (*P != 0))
@@ -74,26 +74,27 @@ public:
 			return parseCurrentNode();
 		}
 
+		_IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX;
 		return false;
 	}
 
 
 	//! Returns the type of the current XML node.
-	virtual EXML_NODE getNodeType() const _IRR_OVERRIDE_
+	virtual EXML_NODE getNodeType() const
 	{
 		return CurrentNodeType;
 	}
 
 
 	//! Returns attribute count of the current XML node.
-	virtual unsigned int getAttributeCount() const _IRR_OVERRIDE_
+	virtual unsigned int getAttributeCount() const
 	{
 		return Attributes.size();
 	}
 
 
 	//! Returns name of an attribute.
-	virtual const char_type* getAttributeName(int idx) const _IRR_OVERRIDE_
+	virtual const char_type* getAttributeName(int idx) const
 	{
 		if ((u32)idx >= Attributes.size())
 			return 0;
@@ -103,7 +104,7 @@ public:
 
 
 	//! Returns the value of an attribute.
-	virtual const char_type* getAttributeValue(int idx) const _IRR_OVERRIDE_
+	virtual const char_type* getAttributeValue(int idx) const
 	{
 		if ((unsigned int)idx >= Attributes.size())
 			return 0;
@@ -113,7 +114,7 @@ public:
 
 
 	//! Returns the value of an attribute.
-	virtual const char_type* getAttributeValue(const char_type* name) const _IRR_OVERRIDE_
+	virtual const char_type* getAttributeValue(const char_type* name) const
 	{
 		const SAttribute* attr = getAttributeByName(name);
 		if (!attr)
@@ -124,7 +125,7 @@ public:
 
 
 	//! Returns the value of an attribute
-	virtual const char_type* getAttributeValueSafe(const char_type* name) const _IRR_OVERRIDE_
+	virtual const char_type* getAttributeValueSafe(const char_type* name) const
 	{
 		const SAttribute* attr = getAttributeByName(name);
 		if (!attr)
@@ -136,11 +137,11 @@ public:
 
 
 	//! Returns the value of an attribute as integer.
-	virtual int getAttributeValueAsInt(const char_type* name, int defaultNotFound) const _IRR_OVERRIDE_
+	int getAttributeValueAsInt(const char_type* name) const
 	{
 		const SAttribute* attr = getAttributeByName(name);
 		if (!attr)
-			return defaultNotFound;
+			return 0;
 
 		core::stringc c(attr->Value.c_str());
 		return core::strtol10(c.c_str());
@@ -148,11 +149,11 @@ public:
 
 
 	//! Returns the value of an attribute as integer.
-	virtual int getAttributeValueAsInt(int idx, int defaultNotFound) const _IRR_OVERRIDE_
+	int getAttributeValueAsInt(int idx) const
 	{
 		const char_type* attrvalue = getAttributeValue(idx);
 		if (!attrvalue)
-			return defaultNotFound;
+			return 0;
 
 		core::stringc c(attrvalue);
 		return core::strtol10(c.c_str());
@@ -160,11 +161,11 @@ public:
 
 
 	//! Returns the value of an attribute as float.
-	virtual float getAttributeValueAsFloat(const char_type* name, float defaultNotFound) const _IRR_OVERRIDE_
+	float getAttributeValueAsFloat(const char_type* name) const
 	{
 		const SAttribute* attr = getAttributeByName(name);
 		if (!attr)
-			return defaultNotFound;
+			return 0;
 
 		core::stringc c = attr->Value.c_str();
 		return core::fast_atof(c.c_str());
@@ -172,11 +173,11 @@ public:
 
 
 	//! Returns the value of an attribute as float.
-	virtual float getAttributeValueAsFloat(int idx, float defaultNotFound) const _IRR_OVERRIDE_
+	float getAttributeValueAsFloat(int idx) const
 	{
 		const char_type* attrvalue = getAttributeValue(idx);
 		if (!attrvalue)
-			return defaultNotFound;
+			return 0;
 
 		core::stringc c = attrvalue;
 		return core::fast_atof(c.c_str());
@@ -184,33 +185,33 @@ public:
 
 
 	//! Returns the name of the current node.
-	virtual const char_type* getNodeName() const _IRR_OVERRIDE_
+	virtual const char_type* getNodeName() const
 	{
 		return NodeName.c_str();
 	}
 
 
 	//! Returns data of the current node.
-	virtual const char_type* getNodeData() const _IRR_OVERRIDE_
+	virtual const char_type* getNodeData() const
 	{
 		return NodeName.c_str();
 	}
 
 
 	//! Returns if an element is an empty element, like <foo />
-	virtual bool isEmptyElement() const _IRR_OVERRIDE_
+	virtual bool isEmptyElement() const
 	{
 		return IsEmptyElement;
 	}
 
 	//! Returns format of the source xml file.
-	virtual ETEXT_FORMAT getSourceFormat() const _IRR_OVERRIDE_
+	virtual ETEXT_FORMAT getSourceFormat() const
 	{
 		return SourceFormat;
 	}
 
 	//! Returns format of the strings returned by the parser.
-	virtual ETEXT_FORMAT getParserFormat() const _IRR_OVERRIDE_
+	virtual ETEXT_FORMAT getParserFormat() const
 	{
 		return TargetFormat;
 	}
@@ -264,9 +265,9 @@ private:
 	//! sets the state that text was found. Returns true if set should be set
 	bool setText(char_type* start, char_type* end)
 	{
-		// By default xml preserves all whitespace. But Irrlicht dropped some whitespace by default
-		// in the past which did lead to OS dependent behavior. We just ignore all whitespace for now
-		// as it's the closest to fixing behavior without breaking downward compatibility too much.
+		// By default xml preserves all whitespace. But Irrlicht dropped some whitespace by default 
+		// in the past which did lead to OS dependent behavior. We just ignore all whitespace for now 
+		// as it's the closest to fixing behavior without breaking downward compatibility too much. 
 		if ( IgnoreWhitespaceText )
 		{
 			char_type* p = start;
@@ -466,8 +467,8 @@ private:
 		while(*P && !cDataEnd)
 		{
 			if (*P == L'>' &&
-				(*(P-1) == L']') &&
-				(*(P-2) == L']'))
+			   (*(P-1) == L']') &&
+			   (*(P-2) == L']'))
 			{
 				cDataEnd = P - 2;
 			}
@@ -565,9 +566,8 @@ private:
 		long size = callback->getSize();
 		if (size<0)
 			return false;
-		// We need four terminating 0's at the end.
-		// For ASCII we need 1 0's, for UTF-16 2, for UTF-32 4.
-		size += 4;
+		size += 4; // We need four terminating 0's at the end.
+		           // For ASCII we need 1 0's, for UTF-16 2, for UTF-32 4.
 
 		char* data8 = new char[size];
 
@@ -595,7 +595,7 @@ private:
 
 		// check source for all utf versions and convert to target data format
 
-		if (size >= 4 && data32[0]
+		if (size >= 4 && data32[0] 
 			== static_cast<char32>(UTF32_BE))
 		{
 			// UTF-32, big endian
@@ -704,9 +704,9 @@ private:
 			while(*t)
 			{
 				*t = ((*t & 0xff000000) >> 24) |
-					((*t & 0x00ff0000) >> 8)  |
-					((*t & 0x0000ff00) << 8)  |
-					((*t & 0x000000ff) << 24);
+				     ((*t & 0x00ff0000) >> 8)  |
+				     ((*t & 0x0000ff00) << 8)  |
+				     ((*t & 0x000000ff) << 24);
 				++t;
 			}
 		}
@@ -726,9 +726,9 @@ private:
 	inline bool isLittleEndian(ETEXT_FORMAT f)
 	{
 		return f == ETF_ASCII ||
-			f == ETF_UTF8 ||
-			f == ETF_UTF16_LE ||
-			f == ETF_UTF32_LE;
+		       f == ETF_UTF8 ||
+		       f == ETF_UTF16_LE ||
+		       f == ETF_UTF32_LE;
 	}
 
 
@@ -764,7 +764,7 @@ private:
 				return false;
 
 		// if one (or both) of the strings was smaller then they
-		// are only equal if they have the same length
+		// are only equal if they have the same lenght
 		return (i == len) || (str1[i] == 0 && str2[i] == 0);
 	}
 
@@ -793,7 +793,7 @@ private:
 
 
 	// instance variables:
-	bool IgnoreWhitespaceText;   // do not return EXN_TEXT nodes for pure whitespace
+	bool IgnoreWhitespaceText;	 // do not return EXN_TEXT nodes for pure whitespace
 	char_type* TextData;         // data block of the text file
 	char_type* P;                // current point in text to parse
 	char_type* TextBegin;        // start of text to parse

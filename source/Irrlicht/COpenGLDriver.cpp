@@ -3,22 +3,23 @@
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
 #include "COpenGLDriver.h"
+// needed here also because of the create methods' parameters
 #include "CNullDriver.h"
-#include "IContextManager.h"
 
 #ifdef _IRR_COMPILE_WITH_OPENGL_
 
-#include "os.h"
-
-#include "COpenGLCacheHandler.h"
+#include "COpenGLTexture.h"
 #include "COpenGLMaterialRenderer.h"
 #include "COpenGLShaderMaterialRenderer.h"
 #include "COpenGLSLMaterialRenderer.h"
+#include "COpenGLCgMaterialRenderer.h"
 #include "COpenGLNormalMapRenderer.h"
 #include "COpenGLParallaxMapRenderer.h"
+#include "os.h"
 
-#include "COpenGLCoreTexture.h"
-#include "COpenGLCoreRenderTarget.h"
+#ifdef _IRR_COMPILE_WITH_OSX_DEVICE_
+#include "MacOSX/CIrrDeviceMacOSX.h"
+#endif
 
 #ifdef _IRR_COMPILE_WITH_SDL_DEVICE_
 #include <SDL/SDL.h>
@@ -29,84 +30,627 @@ namespace irr
 namespace video
 {
 
-// Statics variables
-const u16 COpenGLDriver::Quad2DIndices[4] = { 0, 1, 2, 3 };
-
-#if defined(_IRR_COMPILE_WITH_WINDOWS_DEVICE_) || defined(_IRR_COMPILE_WITH_X11_DEVICE_) || defined(_IRR_COMPILE_WITH_OSX_DEVICE_)
-COpenGLDriver::COpenGLDriver(const SIrrlichtCreationParameters& params, io::IFileSystem* io, IContextManager* contextManager)
-	: CNullDriver(io, params.WindowSize), COpenGLExtensionHandler(), CacheHandler(0), CurrentRenderMode(ERM_NONE), ResetRenderStates(true),
-	Transformation3DChanged(true), AntiAlias(params.AntiAlias), ColorFormat(ECF_R8G8B8), FixedPipelineState(EOFPS_ENABLE), Params(params),
-	ContextManager(contextManager),
-#if defined(_IRR_COMPILE_WITH_WINDOWS_DEVICE_)
-	DeviceType(EIDT_WIN32)
-#elif defined(_IRR_COMPILE_WITH_X11_DEVICE_)
-	DeviceType(EIDT_X11)
-#else
-	DeviceType(EIDT_OSX)
-#endif
-{
-#ifdef _DEBUG
-	setDebugName("COpenGLDriver");
-#endif
-}
-#endif
-
-#ifdef _IRR_COMPILE_WITH_SDL_DEVICE_
-COpenGLDriver::COpenGLDriver(const SIrrlichtCreationParameters& params, io::IFileSystem* io, CIrrDeviceSDL* device)
-	: CNullDriver(io, params.WindowSize), COpenGLExtensionHandler(), CacheHandler(0),
+// -----------------------------------------------------------------------
+// WINDOWS CONSTRUCTOR
+// -----------------------------------------------------------------------
+#ifdef _IRR_COMPILE_WITH_WINDOWS_DEVICE_
+//! Windows constructor and init code
+COpenGLDriver::COpenGLDriver(const irr::SIrrlichtCreationParameters& params,
+		io::IFileSystem* io, CIrrDeviceWin32* device)
+: CNullDriver(io, params.WindowSize), COpenGLExtensionHandler(),
 	CurrentRenderMode(ERM_NONE), ResetRenderStates(true), Transformation3DChanged(true),
-	AntiAlias(params.AntiAlias), ColorFormat(ECF_R8G8B8), FixedPipelineState(EOFPS_ENABLE),
-	Params(params), SDLDevice(device), ContextManager(0), DeviceType(EIDT_SDL)
+	AntiAlias(params.AntiAlias), RenderTargetTexture(0),
+	CurrentRendertargetSize(0,0), ColorFormat(ECF_R8G8B8),
+	CurrentTarget(ERT_FRAME_BUFFER), Params(params),
+	HDc(0), Window(static_cast<HWND>(params.WindowId)), Win32Device(device),
+	DeviceType(EIDT_WIN32)
 {
-#ifdef _DEBUG
+	#ifdef _DEBUG
 	setDebugName("COpenGLDriver");
-#endif
+	#endif
 
-	genericDriverInit();
+	#ifdef _IRR_COMPILE_WITH_CG_
+	CgContext = 0;
+	#endif
 }
 
-#endif
 
-bool COpenGLDriver::initDriver()
+bool COpenGLDriver::changeRenderContext(const SExposedVideoData& videoData, CIrrDeviceWin32* device)
 {
-	ContextManager->generateSurface();
-	ContextManager->generateContext();
-	ExposedData = ContextManager->getContext();
-	ContextManager->activateContext(ExposedData);
-
-	genericDriverInit();
-
-#if defined(_IRR_COMPILE_WITH_WINDOWS_DEVICE_) || defined(_IRR_COMPILE_WITH_X11_DEVICE_)
-	extGlSwapInterval(Params.Vsync ? 1 : 0);
-#endif
-
+	if (videoData.OpenGLWin32.HWnd && videoData.OpenGLWin32.HDc && videoData.OpenGLWin32.HRc)
+	{
+		if (!wglMakeCurrent((HDC)videoData.OpenGLWin32.HDc, (HGLRC)videoData.OpenGLWin32.HRc))
+		{
+			os::Printer::log("Render Context switch failed.");
+			return false;
+		}
+		else
+		{
+			HDc = (HDC)videoData.OpenGLWin32.HDc;
+		}
+	}
+	// set back to main context
+	else if (HDc != ExposedData.OpenGLWin32.HDc)
+	{
+		if (!wglMakeCurrent((HDC)ExposedData.OpenGLWin32.HDc, (HGLRC)ExposedData.OpenGLWin32.HRc))
+		{
+			os::Printer::log("Render Context switch failed.");
+			return false;
+		}
+		else
+		{
+			HDc = (HDC)ExposedData.OpenGLWin32.HDc;
+		}
+	}
 	return true;
 }
+
+//! inits the open gl driver
+bool COpenGLDriver::initDriver(CIrrDeviceWin32* device)
+{
+	// Create a window to test antialiasing support
+	const fschar_t* ClassName = __TEXT("GLCIrrDeviceWin32");
+	HINSTANCE lhInstance = GetModuleHandle(0);
+
+	// Register Class
+	WNDCLASSEX wcex;
+	wcex.cbSize        = sizeof(WNDCLASSEX);
+	wcex.style         = CS_HREDRAW | CS_VREDRAW;
+	wcex.lpfnWndProc   = (WNDPROC)DefWindowProc;
+	wcex.cbClsExtra    = 0;
+	wcex.cbWndExtra    = 0;
+	wcex.hInstance     = lhInstance;
+	wcex.hIcon         = NULL;
+	wcex.hCursor       = LoadCursor(NULL, IDC_ARROW);
+	wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
+	wcex.lpszMenuName  = 0;
+	wcex.lpszClassName = ClassName;
+	wcex.hIconSm       = 0;
+	wcex.hIcon         = 0;
+	RegisterClassEx(&wcex);
+
+	RECT clientSize;
+	clientSize.top = 0;
+	clientSize.left = 0;
+	clientSize.right = Params.WindowSize.Width;
+	clientSize.bottom = Params.WindowSize.Height;
+
+	DWORD style = WS_POPUP;
+	if (!Params.Fullscreen)
+		style = WS_SYSMENU | WS_BORDER | WS_CAPTION | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
+
+	AdjustWindowRect(&clientSize, style, FALSE);
+
+	const s32 realWidth = clientSize.right - clientSize.left;
+	const s32 realHeight = clientSize.bottom - clientSize.top;
+
+	const s32 windowLeft = (GetSystemMetrics(SM_CXSCREEN) - realWidth) / 2;
+	const s32 windowTop = (GetSystemMetrics(SM_CYSCREEN) - realHeight) / 2;
+
+	HWND temporary_wnd=CreateWindow(ClassName, __TEXT(""), style, windowLeft,
+			windowTop, realWidth, realHeight, NULL, NULL, lhInstance, NULL);
+
+	if (!temporary_wnd)
+	{
+		os::Printer::log("Cannot create a temporary window.", ELL_ERROR);
+		UnregisterClass(ClassName, lhInstance);
+		return false;
+	}
+
+	HDc = GetDC(temporary_wnd);
+
+	// Set up pixel format descriptor with desired parameters
+	PIXELFORMATDESCRIPTOR pfd = {
+		sizeof(PIXELFORMATDESCRIPTOR),             // Size Of This Pixel Format Descriptor
+		1,                                         // Version Number
+		PFD_DRAW_TO_WINDOW |                       // Format Must Support Window
+		PFD_SUPPORT_OPENGL |                       // Format Must Support OpenGL
+		(Params.Doublebuffer?PFD_DOUBLEBUFFER:0) | // Must Support Double Buffering
+		(Params.Stereobuffer?PFD_STEREO:0),        // Must Support Stereo Buffer
+		PFD_TYPE_RGBA,                             // Request An RGBA Format
+		Params.Bits,                               // Select Our Color Depth
+		0, 0, 0, 0, 0, 0,                          // Color Bits Ignored
+		0,                                         // No Alpha Buffer
+		0,                                         // Shift Bit Ignored
+		0,                                         // No Accumulation Buffer
+		0, 0, 0, 0,	                               // Accumulation Bits Ignored
+		Params.ZBufferBits,                        // Z-Buffer (Depth Buffer)
+		BYTE(Params.Stencilbuffer ? 1 : 0),        // Stencil Buffer Depth
+		0,                                         // No Auxiliary Buffer
+		PFD_MAIN_PLANE,                            // Main Drawing Layer
+		0,                                         // Reserved
+		0, 0, 0                                    // Layer Masks Ignored
+	};
+
+	GLuint PixelFormat;
+
+	for (u32 i=0; i<6; ++i)
+	{
+		if (i == 1)
+		{
+			if (Params.Stencilbuffer)
+			{
+				os::Printer::log("Cannot create a GL device with stencil buffer, disabling stencil shadows.", ELL_WARNING);
+				Params.Stencilbuffer = false;
+				pfd.cStencilBits = 0;
+			}
+			else
+				continue;
+		}
+		else
+		if (i == 2)
+		{
+			pfd.cDepthBits = 24;
+		}
+		else
+		if (i == 3)
+		{
+			if (Params.Bits!=16)
+				pfd.cDepthBits = 16;
+			else
+				continue;
+		}
+		else
+		if (i == 4)
+		{
+			// try single buffer
+			if (Params.Doublebuffer)
+				pfd.dwFlags &= ~PFD_DOUBLEBUFFER;
+			else
+				continue;
+		}
+		else
+		if (i == 5)
+		{
+			os::Printer::log("Cannot create a GL device context", "No suitable format for temporary window.", ELL_ERROR);
+			ReleaseDC(temporary_wnd, HDc);
+			DestroyWindow(temporary_wnd);
+			UnregisterClass(ClassName, lhInstance);
+			return false;
+		}
+
+		// choose pixelformat
+		PixelFormat = ChoosePixelFormat(HDc, &pfd);
+		if (PixelFormat)
+			break;
+	}
+
+	SetPixelFormat(HDc, PixelFormat, &pfd);
+	HGLRC hrc=wglCreateContext(HDc);
+	if (!hrc)
+	{
+		os::Printer::log("Cannot create a temporary GL rendering context.", ELL_ERROR);
+		ReleaseDC(temporary_wnd, HDc);
+		DestroyWindow(temporary_wnd);
+		UnregisterClass(ClassName, lhInstance);
+		return false;
+	}
+
+	SExposedVideoData data;
+	data.OpenGLWin32.HDc = HDc;
+	data.OpenGLWin32.HRc = hrc;
+	data.OpenGLWin32.HWnd = temporary_wnd;
+
+
+	if (!changeRenderContext(data, device))
+	{
+		os::Printer::log("Cannot activate a temporary GL rendering context.", ELL_ERROR);
+		wglDeleteContext(hrc);
+		ReleaseDC(temporary_wnd, HDc);
+		DestroyWindow(temporary_wnd);
+		UnregisterClass(ClassName, lhInstance);
+		return false;
+	}
+
+	core::stringc wglExtensions;
+#ifdef WGL_ARB_extensions_string
+	PFNWGLGETEXTENSIONSSTRINGARBPROC irrGetExtensionsString = (PFNWGLGETEXTENSIONSSTRINGARBPROC)wglGetProcAddress("wglGetExtensionsStringARB");
+	if (irrGetExtensionsString)
+		wglExtensions = irrGetExtensionsString(HDc);
+#elif defined(WGL_EXT_extensions_string)
+	PFNWGLGETEXTENSIONSSTRINGEXTPROC irrGetExtensionsString = (PFNWGLGETEXTENSIONSSTRINGEXTPROC)wglGetProcAddress("wglGetExtensionsStringEXT");
+	if (irrGetExtensionsString)
+		wglExtensions = irrGetExtensionsString(HDc);
+#endif
+	const bool pixel_format_supported = (wglExtensions.find("WGL_ARB_pixel_format") != -1);
+	const bool multi_sample_supported = ((wglExtensions.find("WGL_ARB_multisample") != -1) ||
+		(wglExtensions.find("WGL_EXT_multisample") != -1) || (wglExtensions.find("WGL_3DFX_multisample") != -1) );
+#ifdef _DEBUG
+	os::Printer::log("WGL_extensions", wglExtensions);
+#endif
+
+#ifdef WGL_ARB_pixel_format
+	PFNWGLCHOOSEPIXELFORMATARBPROC wglChoosePixelFormat_ARB = (PFNWGLCHOOSEPIXELFORMATARBPROC)wglGetProcAddress("wglChoosePixelFormatARB");
+	if (pixel_format_supported && wglChoosePixelFormat_ARB)
+	{
+		// This value determines the number of samples used for antialiasing
+		// My experience is that 8 does not show a big
+		// improvement over 4, but 4 shows a big improvement
+		// over 2.
+
+		if(AntiAlias > 32)
+			AntiAlias = 32;
+
+		f32 fAttributes[] = {0.0, 0.0};
+		s32 iAttributes[] =
+		{
+			WGL_DRAW_TO_WINDOW_ARB,1,
+			WGL_SUPPORT_OPENGL_ARB,1,
+			WGL_ACCELERATION_ARB,WGL_FULL_ACCELERATION_ARB,
+			WGL_COLOR_BITS_ARB,(Params.Bits==32) ? 24 : 15,
+			WGL_ALPHA_BITS_ARB,(Params.Bits==32) ? 8 : 1,
+			WGL_DEPTH_BITS_ARB,Params.ZBufferBits, // 10,11
+			WGL_STENCIL_BITS_ARB,Params.Stencilbuffer ? 1 : 0,
+			WGL_DOUBLE_BUFFER_ARB,Params.Doublebuffer ? 1 : 0,
+			WGL_STEREO_ARB,Params.Stereobuffer ? 1 : 0,
+			WGL_PIXEL_TYPE_ARB, WGL_TYPE_RGBA_ARB,
+#ifdef WGL_ARB_multisample
+			WGL_SAMPLES_ARB,AntiAlias, // 20,21
+			WGL_SAMPLE_BUFFERS_ARB, 1,
+#elif defined(WGL_EXT_multisample)
+			WGL_SAMPLES_EXT,AntiAlias, // 20,21
+			WGL_SAMPLE_BUFFERS_EXT, 1,
+#elif defined(WGL_3DFX_multisample)
+			WGL_SAMPLES_3DFX,AntiAlias, // 20,21
+			WGL_SAMPLE_BUFFERS_3DFX, 1,
+#endif
+#ifdef WGL_ARB_framebuffer_sRGB
+			WGL_FRAMEBUFFER_SRGB_CAPABLE_ARB, Params.HandleSRGB ? 1:0,
+#elif defined(WGL_EXT_framebuffer_sRGB)
+			WGL_FRAMEBUFFER_SRGB_CAPABLE_EXT, Params.HandleSRGB ? 1:0,
+#endif
+//			WGL_DEPTH_FLOAT_EXT, 1,
+			0,0,0,0
+		};
+		int iAttrSize = sizeof(iAttributes)/sizeof(int);
+		const bool framebuffer_srgb_supported = ((wglExtensions.find("WGL_ARB_framebuffer_sRGB") != -1) ||
+			(wglExtensions.find("WGL_EXT_framebuffer_sRGB") != -1));
+		if (!framebuffer_srgb_supported)
+		{
+			memmove(&iAttributes[24],&iAttributes[26],sizeof(int)*(iAttrSize-26));
+			iAttrSize -= 2;
+		}
+		if (!multi_sample_supported)
+		{
+			memmove(&iAttributes[20],&iAttributes[24],sizeof(int)*(iAttrSize-24));
+			iAttrSize -= 4;
+		}
+
+		s32 rv=0;
+		// Try to get an acceptable pixel format
+		do
+		{
+			int pixelFormat=0;
+			UINT numFormats=0;
+			const BOOL valid = wglChoosePixelFormat_ARB(HDc,iAttributes,fAttributes,1,&pixelFormat,&numFormats);
+
+			if (valid && numFormats)
+				rv = pixelFormat;
+			else
+				iAttributes[21] -= 1;
+		}
+		while(rv==0 && iAttributes[21]>1);
+		if (rv)
+		{
+			PixelFormat=rv;
+			AntiAlias=iAttributes[21];
+		}
+	}
+	else
+#endif
+		AntiAlias=0;
+
+	wglMakeCurrent(HDc, NULL);
+	wglDeleteContext(hrc);
+	ReleaseDC(temporary_wnd, HDc);
+	DestroyWindow(temporary_wnd);
+	UnregisterClass(ClassName, lhInstance);
+
+	// get hdc
+	HDc=GetDC(Window);
+	if (!HDc)
+	{
+		os::Printer::log("Cannot create a GL device context.", ELL_ERROR);
+		return false;
+	}
+
+	// search for pixel format the simple way
+	if (PixelFormat==0 || (!SetPixelFormat(HDc, PixelFormat, &pfd)))
+	{
+		for (u32 i=0; i<5; ++i)
+		{
+			if (i == 1)
+			{
+				if (Params.Stencilbuffer)
+				{
+					os::Printer::log("Cannot create a GL device with stencil buffer, disabling stencil shadows.", ELL_WARNING);
+					Params.Stencilbuffer = false;
+					pfd.cStencilBits = 0;
+				}
+				else
+					continue;
+			}
+			else
+			if (i == 2)
+			{
+				pfd.cDepthBits = 24;
+			}
+			if (i == 3)
+			{
+				if (Params.Bits!=16)
+					pfd.cDepthBits = 16;
+				else
+					continue;
+			}
+			else
+			if (i == 4)
+			{
+				os::Printer::log("Cannot create a GL device context", "No suitable format.", ELL_ERROR);
+				return false;
+			}
+
+			// choose pixelformat
+			PixelFormat = ChoosePixelFormat(HDc, &pfd);
+			if (PixelFormat)
+				break;
+		}
+
+		// set pixel format
+		if (!SetPixelFormat(HDc, PixelFormat, &pfd))
+		{
+			os::Printer::log("Cannot set the pixel format.", ELL_ERROR);
+			return false;
+		}
+	}
+
+	os::Printer::log("Pixel Format", core::stringc(PixelFormat).c_str(), ELL_DEBUG);
+
+	// create rendering context
+#ifdef WGL_ARB_create_context
+	PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribs_ARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
+	if (wglCreateContextAttribs_ARB)
+	{
+		int iAttribs[] =
+		{
+			WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
+			WGL_CONTEXT_MINOR_VERSION_ARB, 1,
+			0
+		};
+		hrc=wglCreateContextAttribs_ARB(HDc, 0, iAttribs);
+	}
+	else
+#endif
+		hrc=wglCreateContext(HDc);
+
+	if (!hrc)
+	{
+		os::Printer::log("Cannot create a GL rendering context.", ELL_ERROR);
+		return false;
+	}
+
+	// set exposed data
+	ExposedData.OpenGLWin32.HDc = HDc;
+	ExposedData.OpenGLWin32.HRc = hrc;
+	ExposedData.OpenGLWin32.HWnd = Window;
+
+	// activate rendering context
+
+	if (!changeRenderContext(ExposedData, device))
+	{
+		os::Printer::log("Cannot activate GL rendering context", ELL_ERROR);
+		wglDeleteContext(hrc);
+		return false;
+	}
+
+	int pf = GetPixelFormat(HDc);
+	DescribePixelFormat(HDc, pf, sizeof(PIXELFORMATDESCRIPTOR), &pfd);
+	if (pfd.cAlphaBits != 0)
+	{
+		if (pfd.cRedBits == 8)
+			ColorFormat = ECF_A8R8G8B8;
+		else
+			ColorFormat = ECF_A1R5G5B5;
+	}
+	else
+	{
+		if (pfd.cRedBits == 8)
+			ColorFormat = ECF_R8G8B8;
+		else
+			ColorFormat = ECF_R5G6B5;
+	}
+
+	genericDriverInit();
+
+	extGlSwapInterval(Params.Vsync ? 1 : 0);
+	return true;
+}
+
+#endif // _IRR_COMPILE_WITH_WINDOWS_DEVICE_
+
+// -----------------------------------------------------------------------
+// MacOSX CONSTRUCTOR
+// -----------------------------------------------------------------------
+#ifdef _IRR_COMPILE_WITH_OSX_DEVICE_
+//! Windows constructor and init code
+COpenGLDriver::COpenGLDriver(const SIrrlichtCreationParameters& params,
+		io::IFileSystem* io, CIrrDeviceMacOSX *device)
+: CNullDriver(io, params.WindowSize), COpenGLExtensionHandler(),
+	CurrentRenderMode(ERM_NONE), ResetRenderStates(true), Transformation3DChanged(true),
+	AntiAlias(params.AntiAlias), RenderTargetTexture(0),
+	CurrentRendertargetSize(0,0), ColorFormat(ECF_R8G8B8),
+	CurrentTarget(ERT_FRAME_BUFFER), Params(params),
+	OSXDevice(device), DeviceType(EIDT_OSX)
+{
+	#ifdef _DEBUG
+	setDebugName("COpenGLDriver");
+	#endif
+
+	#ifdef _IRR_COMPILE_WITH_CG_
+	CgContext = 0;
+	#endif
+
+	genericDriverInit();
+}
+
+#endif
+
+// -----------------------------------------------------------------------
+// LINUX CONSTRUCTOR
+// -----------------------------------------------------------------------
+#ifdef _IRR_COMPILE_WITH_X11_DEVICE_
+//! Linux constructor and init code
+COpenGLDriver::COpenGLDriver(const SIrrlichtCreationParameters& params,
+		io::IFileSystem* io, CIrrDeviceLinux* device)
+: CNullDriver(io, params.WindowSize), COpenGLExtensionHandler(),
+	CurrentRenderMode(ERM_NONE), ResetRenderStates(true),
+	Transformation3DChanged(true), AntiAlias(params.AntiAlias),
+	RenderTargetTexture(0), CurrentRendertargetSize(0,0), ColorFormat(ECF_R8G8B8),
+	CurrentTarget(ERT_FRAME_BUFFER), Params(params),
+	X11Device(device), DeviceType(EIDT_X11)
+{
+	#ifdef _DEBUG
+	setDebugName("COpenGLDriver");
+	#endif
+
+	#ifdef _IRR_COMPILE_WITH_CG_
+	CgContext = 0;
+	#endif
+}
+
+
+bool COpenGLDriver::changeRenderContext(const SExposedVideoData& videoData, CIrrDeviceLinux* device)
+{
+	if (videoData.OpenGLLinux.X11Window)
+	{
+		if (videoData.OpenGLLinux.X11Display && videoData.OpenGLLinux.X11Context)
+		{
+			if (!glXMakeCurrent((Display*)videoData.OpenGLLinux.X11Display, videoData.OpenGLLinux.X11Window, (GLXContext)videoData.OpenGLLinux.X11Context))
+			{
+				os::Printer::log("Render Context switch failed.");
+				return false;
+			}
+			else
+			{
+				Drawable = videoData.OpenGLLinux.X11Window;
+				X11Display = (Display*)videoData.OpenGLLinux.X11Display;
+			}
+		}
+		else
+		{
+			// in case we only got a window ID, try with the existing values for display and context
+			if (!glXMakeCurrent((Display*)ExposedData.OpenGLLinux.X11Display, videoData.OpenGLLinux.X11Window, (GLXContext)ExposedData.OpenGLLinux.X11Context))
+			{
+				os::Printer::log("Render Context switch failed.");
+				return false;
+			}
+			else
+			{
+				Drawable = videoData.OpenGLLinux.X11Window;
+				X11Display = (Display*)ExposedData.OpenGLLinux.X11Display;
+			}
+		}
+	}
+	// set back to main context
+	else if (X11Display != ExposedData.OpenGLLinux.X11Display)
+	{
+		if (!glXMakeCurrent((Display*)ExposedData.OpenGLLinux.X11Display, ExposedData.OpenGLLinux.X11Window, (GLXContext)ExposedData.OpenGLLinux.X11Context))
+		{
+			os::Printer::log("Render Context switch failed.");
+			return false;
+		}
+		else
+		{
+			Drawable = ExposedData.OpenGLLinux.X11Window;
+			X11Display = (Display*)ExposedData.OpenGLLinux.X11Display;
+		}
+	}
+	return true;
+}
+
+
+//! inits the open gl driver
+bool COpenGLDriver::initDriver(CIrrDeviceLinux* device)
+{
+	ExposedData.OpenGLLinux.X11Context = glXGetCurrentContext();
+	ExposedData.OpenGLLinux.X11Display = glXGetCurrentDisplay();
+	ExposedData.OpenGLLinux.X11Window = (unsigned long)Params.WindowId;
+	Drawable = glXGetCurrentDrawable();
+	X11Display = (Display*)ExposedData.OpenGLLinux.X11Display;
+
+	genericDriverInit();
+
+	// set vsync
+	extGlSwapInterval(Params.Vsync ? 1 : 0);
+	return true;
+}
+
+#endif // _IRR_COMPILE_WITH_X11_DEVICE_
+
+
+// -----------------------------------------------------------------------
+// SDL CONSTRUCTOR
+// -----------------------------------------------------------------------
+#ifdef _IRR_COMPILE_WITH_SDL_DEVICE_
+//! SDL constructor and init code
+COpenGLDriver::COpenGLDriver(const SIrrlichtCreationParameters& params,
+		io::IFileSystem* io, CIrrDeviceSDL* device)
+: CNullDriver(io, params.WindowSize), COpenGLExtensionHandler(),
+	CurrentRenderMode(ERM_NONE), ResetRenderStates(true),
+	Transformation3DChanged(true), AntiAlias(params.AntiAlias),
+	RenderTargetTexture(0), CurrentRendertargetSize(0,0), ColorFormat(ECF_R8G8B8),
+	CurrentTarget(ERT_FRAME_BUFFER), Params(params),
+	SDLDevice(device), DeviceType(EIDT_SDL)
+{
+	#ifdef _DEBUG
+	setDebugName("COpenGLDriver");
+	#endif
+
+	#ifdef _IRR_COMPILE_WITH_CG_
+	CgContext = 0;
+	#endif
+
+	genericDriverInit();
+}
+
+#endif // _IRR_COMPILE_WITH_SDL_DEVICE_
+
 
 //! destructor
 COpenGLDriver::~COpenGLDriver()
 {
+	#ifdef _IRR_COMPILE_WITH_CG_
+	if (CgContext)
+		cgDestroyContext(CgContext);
+	#endif
+
 	RequestedLights.clear();
 
 	deleteMaterialRenders();
 
-	CacheHandler->getTextureCache().clear();
+	CurrentTexture.clear();
 	// I get a blue screen on my laptop, when I do not delete the
 	// textures manually before releasing the dc. Oh how I love this.
-	removeAllRenderTargets();
 	deleteAllTextures();
 	removeAllOcclusionQueries();
 	removeAllHardwareBuffers();
 
-	delete CacheHandler;
-
-	if (ContextManager)
+#ifdef _IRR_COMPILE_WITH_WINDOWS_DEVICE_
+	if (DeviceType == EIDT_WIN32)
 	{
-		ContextManager->destroyContext();
-		ContextManager->destroySurface();
-		ContextManager->terminate();
-		ContextManager->drop();
+
+		if (ExposedData.OpenGLWin32.HRc)
+		{
+			if (!wglMakeCurrent(HDc, 0))
+				os::Printer::log("Release of dc and rc failed.", ELL_WARNING);
+
+			if (!wglDeleteContext((HGLRC)ExposedData.OpenGLWin32.HRc))
+				os::Printer::log("Release of rendering context failed.", ELL_WARNING);
+		}
+
+		if (HDc)
+			ReleaseDC(Window, HDc);
 	}
+#endif
 }
 
 // -----------------------------------------------------------------------
@@ -115,9 +659,6 @@ COpenGLDriver::~COpenGLDriver()
 
 bool COpenGLDriver::genericDriverInit()
 {
-	if (ContextManager)
-		ContextManager->grab();
-
 	Name=L"OpenGL ";
 	Name.append(glGetString(GL_VERSION));
 	s32 pos=Name.findNext(L' ', 7);
@@ -135,30 +676,25 @@ bool COpenGLDriver::genericDriverInit()
 	}
 
 	u32 i;
-
+	CurrentTexture.clear();
 	// load extensions
 	initExtensions(Params.Stencilbuffer);
-
-	// reset cache handler
-	delete CacheHandler;
-	CacheHandler = new COpenGLCacheHandler(this);
-
 	if (queryFeature(EVDF_ARB_GLSL))
 	{
 		char buf[32];
 		const u32 maj = ShaderLanguageVersion/100;
-		snprintf_irr(buf, 32, "%u.%u", maj, ShaderLanguageVersion-maj*100);
+		snprintf(buf, 32, "%u.%u", maj, ShaderLanguageVersion-maj*100);
 		os::Printer::log("GLSL version", buf, ELL_INFORMATION);
 	}
 	else
 		os::Printer::log("GLSL not available.", ELL_INFORMATION);
-	DriverAttributes->setAttribute("MaxTextures", (s32)Feature.TextureUnit);
-	DriverAttributes->setAttribute("MaxSupportedTextures", (s32)Feature.TextureUnit);
+	DriverAttributes->setAttribute("MaxTextures", MaxTextureUnits);
+	DriverAttributes->setAttribute("MaxSupportedTextures", MaxSupportedTextures);
 	DriverAttributes->setAttribute("MaxLights", MaxLights);
 	DriverAttributes->setAttribute("MaxAnisotropy", MaxAnisotropy);
 	DriverAttributes->setAttribute("MaxUserClipPlanes", MaxUserClipPlanes);
 	DriverAttributes->setAttribute("MaxAuxBuffers", MaxAuxBuffers);
-	DriverAttributes->setAttribute("MaxMultipleRenderTargets", (s32)Feature.MultipleRenderTarget);
+	DriverAttributes->setAttribute("MaxMultipleRenderTargets", MaxMultipleRenderTargets);
 	DriverAttributes->setAttribute("MaxIndices", (s32)MaxIndices);
 	DriverAttributes->setAttribute("MaxTextureSize", (s32)MaxTextureSize);
 	DriverAttributes->setAttribute("MaxGeometryVerticesOut", (s32)MaxGeometryVerticesOut);
@@ -168,6 +704,9 @@ bool COpenGLDriver::genericDriverInit()
 	DriverAttributes->setAttribute("AntiAlias", AntiAlias);
 
 	glPixelStorei(GL_PACK_ALIGNMENT, 1);
+
+	// Reset The Current Viewport
+	glViewport(0, 0, Params.WindowSize.Width, Params.WindowSize.Height);
 
 	UserClipPlanes.reallocate(MaxUserClipPlanes);
 	for (i=0; i<MaxUserClipPlanes; ++i)
@@ -201,23 +740,20 @@ bool COpenGLDriver::genericDriverInit()
 	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
 	glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
 	glHint(GL_POINT_SMOOTH_HINT, GL_FASTEST);
+	glDepthFunc(GL_LEQUAL);
 	glFrontFace(GL_CW);
 	// adjust flat coloring scheme to DirectX version
 #if defined(GL_ARB_provoking_vertex) || defined(GL_EXT_provoking_vertex)
 	extGlProvokingVertex(GL_FIRST_VERTEX_CONVENTION_EXT);
 #endif
 
-	// Create built-in 2D quad for 2D rendering (both quads and lines).
-	Quad2DVertices[0] = S3DVertex(core::vector3df(-1.0f, 1.0f, 0.0f), core::vector3df(0.0f, 0.0f, 0.0f), SColor(255,255,255,255), core::vector2df(0.0f, 1.0f));
-	Quad2DVertices[1] = S3DVertex(core::vector3df(1.0f, 1.0f, 0.0f), core::vector3df(0.0f, 0.0f, 0.0f), SColor(255,255,255,255), core::vector2df(1.0f, 1.0f));
-	Quad2DVertices[2] = S3DVertex(core::vector3df(1.0f, -1.0f, 0.0f), core::vector3df(0.0f, 0.0f, 0.0f), SColor(255,255,255,255), core::vector2df(1.0f, 0.0f));
-	Quad2DVertices[3] = S3DVertex(core::vector3df(-1.0f, -1.0f, 0.0f), core::vector3df(0.0f, 0.0f, 0.0f), SColor(255,255,255,255), core::vector2df(0.0f, 0.0f));
-
 	// create material renderers
 	createMaterialRenderers();
 
 	// set the renderstates
 	setRenderStates3DMode();
+
+	glAlphaFunc(GL_GREATER, 0.f);
 
 	// set fog mode
 	setFog(FogColor, FogType, FogStart, FogEnd, FogDensity, PixelFog, RangeFog);
@@ -228,6 +764,10 @@ bool COpenGLDriver::genericDriverInit()
 	// We need to reset once more at the beginning of the first rendering.
 	// This fixes problems with intermediate changes to the material during texture load.
 	ResetRenderStates = true;
+
+	#ifdef _IRR_COMPILE_WITH_CG_
+	CgContext = cgCreateContext();
+	#endif
 
 	return true;
 }
@@ -264,64 +804,130 @@ void COpenGLDriver::createMaterialRenderers()
 	// add normal map renderers
 	s32 tmp = 0;
 	video::IMaterialRenderer* renderer = 0;
-	renderer = new COpenGLNormalMapRenderer(this, tmp, EMT_SOLID);
+	renderer = new COpenGLNormalMapRenderer(this, tmp, MaterialRenderers[EMT_SOLID].Renderer);
 	renderer->drop();
-	renderer = new COpenGLNormalMapRenderer(this, tmp, EMT_TRANSPARENT_ADD_COLOR);
+	renderer = new COpenGLNormalMapRenderer(this, tmp, MaterialRenderers[EMT_TRANSPARENT_ADD_COLOR].Renderer);
 	renderer->drop();
-	renderer = new COpenGLNormalMapRenderer(this, tmp, EMT_TRANSPARENT_VERTEX_ALPHA);
+	renderer = new COpenGLNormalMapRenderer(this, tmp, MaterialRenderers[EMT_TRANSPARENT_VERTEX_ALPHA].Renderer);
 	renderer->drop();
 
 	// add parallax map renderers
-	renderer = new COpenGLParallaxMapRenderer(this, tmp, EMT_SOLID);
+	renderer = new COpenGLParallaxMapRenderer(this, tmp, MaterialRenderers[EMT_SOLID].Renderer);
 	renderer->drop();
-	renderer = new COpenGLParallaxMapRenderer(this, tmp, EMT_TRANSPARENT_ADD_COLOR);
+	renderer = new COpenGLParallaxMapRenderer(this, tmp, MaterialRenderers[EMT_TRANSPARENT_ADD_COLOR].Renderer);
 	renderer->drop();
-	renderer = new COpenGLParallaxMapRenderer(this, tmp, EMT_TRANSPARENT_VERTEX_ALPHA);
+	renderer = new COpenGLParallaxMapRenderer(this, tmp, MaterialRenderers[EMT_TRANSPARENT_VERTEX_ALPHA].Renderer);
 	renderer->drop();
 
 	// add basic 1 texture blending
 	addAndDropMaterialRenderer(new COpenGLMaterialRenderer_ONETEXTURE_BLEND(this));
 }
 
-bool COpenGLDriver::beginScene(u16 clearFlag, SColor clearColor, f32 clearDepth, u8 clearStencil, const SExposedVideoData& videoData, core::rect<s32>* sourceRect)
-{
-	CNullDriver::beginScene(clearFlag, clearColor, clearDepth, clearStencil, videoData, sourceRect);
 
-	if (ContextManager)
-		ContextManager->activateContext(videoData);
-
-#if defined(_IRR_COMPILE_WITH_SDL_DEVICE_)
-	if ( DeviceType == EIDT_SDL )
-		glFrontFace(GL_CW);
-#endif
-
-	clearBuffers(clearFlag, clearColor, clearDepth, clearStencil);
-
-	return true;
-}
-
+//! presents the rendered scene on the screen, returns false if failed
 bool COpenGLDriver::endScene()
 {
 	CNullDriver::endScene();
 
 	glFlush();
 
-	bool status = false;
+#ifdef _IRR_COMPILE_WITH_WINDOWS_DEVICE_
+	if (DeviceType == EIDT_WIN32)
+		return SwapBuffers(HDc) == TRUE;
+#endif
 
-	if (ContextManager)
-		status = ContextManager->swapBuffers();
+#ifdef _IRR_COMPILE_WITH_X11_DEVICE_
+	if (DeviceType == EIDT_X11)
+	{
+		glXSwapBuffers(X11Display, Drawable);
+		return true;
+	}
+#endif
+
+#ifdef _IRR_COMPILE_WITH_OSX_DEVICE_
+	if (DeviceType == EIDT_OSX)
+	{
+		OSXDevice->flush();
+		return true;
+	}
+#endif
 
 #ifdef _IRR_COMPILE_WITH_SDL_DEVICE_
-	if ( DeviceType == EIDT_SDL )
+	if (DeviceType == EIDT_SDL)
 	{
 		SDL_GL_SwapBuffers();
-		status = true;
+		return true;
 	}
 #endif
 
 	// todo: console device present
 
-	return status;
+	return false;
+}
+
+
+//! clears the zbuffer and color buffer
+void COpenGLDriver::clearBuffers(bool backBuffer, bool zBuffer, bool stencilBuffer, SColor color)
+{
+	GLbitfield mask = 0;
+	if (backBuffer)
+	{
+		const f32 inv = 1.0f / 255.0f;
+		glClearColor(color.getRed() * inv, color.getGreen() * inv,
+				color.getBlue() * inv, color.getAlpha() * inv);
+
+		mask |= GL_COLOR_BUFFER_BIT;
+	}
+
+	if (zBuffer)
+	{
+		glDepthMask(GL_TRUE);
+		LastMaterial.ZWriteEnable=true;
+		mask |= GL_DEPTH_BUFFER_BIT;
+	}
+
+	if (stencilBuffer)
+		mask |= GL_STENCIL_BUFFER_BIT;
+
+	if (mask)
+		glClear(mask);
+}
+
+
+//! init call for rendering start
+bool COpenGLDriver::beginScene(bool backBuffer, bool zBuffer, SColor color,
+		const SExposedVideoData& videoData, core::rect<s32>* sourceRect)
+{
+	CNullDriver::beginScene(backBuffer, zBuffer, color, videoData, sourceRect);
+
+	switch (DeviceType)
+	{
+#ifdef _IRR_COMPILE_WITH_WINDOWS_DEVICE_
+	case EIDT_WIN32:
+		changeRenderContext(videoData, Win32Device);
+		break;
+#endif
+#ifdef _IRR_COMPILE_WITH_X11_DEVICE_
+	case EIDT_X11:
+		changeRenderContext(videoData, X11Device);
+		break;
+#endif
+	default:
+		changeRenderContext(videoData, (void*)0);
+		break;
+	}
+
+#if defined(_IRR_COMPILE_WITH_SDL_DEVICE_)
+	if (DeviceType == EIDT_SDL)
+	{
+		// todo: SDL sets glFrontFace(GL_CCW) after driver creation,
+		// it would be better if this was fixed elsewhere.
+		glFrontFace(GL_CW);
+	}
+#endif
+
+	clearBuffers(backBuffer, zBuffer, false, color);
+	return true;
 }
 
 
@@ -344,7 +950,7 @@ void COpenGLDriver::setTransform(E_TRANSFORMATION_STATE state, const core::matri
 	case ETS_WORLD:
 		{
 			// OpenGL only has a model matrix, view and world is not existent. so lets fake these two.
-			CacheHandler->setMatrixMode(GL_MODELVIEW);
+			glMatrixMode(GL_MODELVIEW);
 
 			// first load the viewing transformation for user clip planes
 			glLoadMatrixf((Matrices[ETS_VIEW]).pointer());
@@ -360,12 +966,37 @@ void COpenGLDriver::setTransform(E_TRANSFORMATION_STATE state, const core::matri
 		break;
 	case ETS_PROJECTION:
 		{
-			CacheHandler->setMatrixMode(GL_PROJECTION);
+			glMatrixMode(GL_PROJECTION);
 			glLoadMatrixf(mat.pointer());
 		}
 		break;
+	case ETS_COUNT:
+		return;
 	default:
-		break;
+		{
+			const u32 i = state - ETS_TEXTURE_0;
+			if (i >= MATERIAL_MAX_TEXTURES)
+				break;
+
+			const bool isRTT = Material.getTexture(i) && Material.getTexture(i)->isRenderTarget();
+
+			if (MultiTextureExtension)
+				extGlActiveTexture(GL_TEXTURE0_ARB + i);
+
+			glMatrixMode(GL_TEXTURE);
+			if (!isRTT && mat.isIdentity() )
+				glLoadIdentity();
+			else
+			{
+				GLfloat glmat[16];
+				if (isRTT)
+					getGLTextureMatrix(glmat, mat * TextureFlipMatrix);
+				else
+					getGLTextureMatrix(glmat, mat);
+				glLoadMatrixf(glmat);
+			}
+			break;
+		}
 	}
 }
 
@@ -450,7 +1081,8 @@ bool COpenGLDriver::updateVertexHardwareBuffer(SHWBufferLink_opengl *HWBuffer)
 
 	extGlBindBuffer(GL_ARRAY_BUFFER, HWBuffer->vbo_verticesID);
 
-	// copy data to graphics card
+	//copy data to graphics card
+	glGetError(); // clear error storage
 	if (!newBuffer)
 		extGlBufferSubData(GL_ARRAY_BUFFER, 0, vertexCount * vertexSize, vbuf);
 	else
@@ -467,7 +1099,7 @@ bool COpenGLDriver::updateVertexHardwareBuffer(SHWBufferLink_opengl *HWBuffer)
 
 	extGlBindBuffer(GL_ARRAY_BUFFER, 0);
 
-	return (!testGLError(__LINE__));
+	return (glGetError() == GL_NO_ERROR);
 #else
 	return false;
 #endif
@@ -524,7 +1156,8 @@ bool COpenGLDriver::updateIndexHardwareBuffer(SHWBufferLink_opengl *HWBuffer)
 
 	extGlBindBuffer(GL_ELEMENT_ARRAY_BUFFER, HWBuffer->vbo_indicesID);
 
-	// copy data to graphics card
+	//copy data to graphics card
+	glGetError(); // clear error storage
 	if (!newBuffer)
 		extGlBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, indexCount * indexSize, indices);
 	else
@@ -541,7 +1174,7 @@ bool COpenGLDriver::updateIndexHardwareBuffer(SHWBufferLink_opengl *HWBuffer)
 
 	extGlBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-	return (!testGLError(__LINE__));
+	return (glGetError() == GL_NO_ERROR);
 #else
 	return false;
 #endif
@@ -670,7 +1303,7 @@ void COpenGLDriver::drawHardwareBuffer(SHWBufferLink *_HWBuffer)
 		indexList=0;
 	}
 
-	drawVertexPrimitiveList(vertices, mb->getVertexCount(), indexList, mb->getPrimitiveCount(), mb->getVertexType(), mb->getPrimitiveType(), mb->getIndexType());
+	drawVertexPrimitiveList(vertices, mb->getVertexCount(), indexList, mb->getIndexCount()/3, mb->getVertexType(), scene::EPT_TRIANGLES, mb->getIndexType());
 
 	if (HWBuffer->Mapped_Vertex!=scene::EHM_NEVER)
 		extGlBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -735,7 +1368,7 @@ void COpenGLDriver::runOcclusionQuery(scene::ISceneNode* node, bool visible)
 #else
 				0);
 #endif
-		testGLError(__LINE__);
+		testGLError();
 	}
 }
 
@@ -762,7 +1395,7 @@ void COpenGLDriver::updateOcclusionQuery(scene::ISceneNode* node, bool block)
 						0,
 #endif
 						&available);
-		testGLError(__LINE__);
+		testGLError();
 		if (available==GL_TRUE)
 		{
 			extGlGetQueryObjectiv(OcclusionQueries[index].UID,
@@ -777,7 +1410,7 @@ void COpenGLDriver::updateOcclusionQuery(scene::ISceneNode* node, bool block)
 			if (queryFeature(EVDF_OCCLUSION_QUERY))
 				OcclusionQueries[index].Result = available;
 		}
-		testGLError(__LINE__);
+		testGLError();
 	}
 }
 
@@ -793,16 +1426,6 @@ u32 COpenGLDriver::getOcclusionQueryResult(scene::ISceneNode* node) const
 		return OcclusionQueries[index].Result;
 	else
 		return ~0;
-}
-
-
-//! Create render target.
-IRenderTarget* COpenGLDriver::addRenderTarget()
-{
-	COpenGLRenderTarget* renderTarget = new COpenGLRenderTarget(this);
-	RenderTargets.push_back(renderTarget);
-
-	return renderTarget;
 }
 
 
@@ -832,10 +1455,15 @@ void COpenGLDriver::drawVertexPrimitiveList(const void* vertices, u32 vertexCoun
 	// draw everything
 	setRenderStates3DMode();
 
+	if (MultiTextureExtension)
+		extGlClientActiveTexture(GL_TEXTURE0_ARB);
+
+	glEnableClientState(GL_COLOR_ARRAY);
+	glEnableClientState(GL_VERTEX_ARRAY);
 	if ((pType!=scene::EPT_POINTS) && (pType!=scene::EPT_POINT_SPRITES))
-		CacheHandler->setClientState(true, true, true, true);
-	else
-		CacheHandler->setClientState(true, false, true, false);
+		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+	if ((pType!=scene::EPT_POINTS) && (pType!=scene::EPT_POINT_SPRITES))
+		glEnableClientState(GL_NORMAL_ARRAY);
 
 //due to missing defines in OSX headers, we have to be more specific with this check
 //#if defined(GL_ARB_vertex_array_bgra) || defined(GL_EXT_vertex_array_bgra)
@@ -886,9 +1514,9 @@ void COpenGLDriver::drawVertexPrimitiveList(const void* vertices, u32 vertexCoun
 				glVertexPointer(3, GL_FLOAT, sizeof(S3DVertex), 0);
 			}
 
-			if (Feature.TextureUnit > 0 && CacheHandler->getTextureCache()[1])
+			if (MultiTextureExtension && CurrentTexture[1])
 			{
-				CacheHandler->setClientActiveTexture(GL_TEXTURE0 + 1);
+				extGlClientActiveTexture(GL_TEXTURE1_ARB);
 				glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 				if (vertices)
 					glTexCoordPointer(2, GL_FLOAT, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(vertices))[0].TCoords);
@@ -912,9 +1540,9 @@ void COpenGLDriver::drawVertexPrimitiveList(const void* vertices, u32 vertexCoun
 			}
 
 
-			if (Feature.TextureUnit > 0)
+			if (MultiTextureExtension)
 			{
-				CacheHandler->setClientActiveTexture(GL_TEXTURE0 + 1);
+				extGlClientActiveTexture(GL_TEXTURE1_ARB);
 				glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 				if (vertices)
 					glTexCoordPointer(2, GL_FLOAT, sizeof(S3DVertex2TCoords), &(static_cast<const S3DVertex2TCoords*>(vertices))[0].TCoords2);
@@ -937,16 +1565,16 @@ void COpenGLDriver::drawVertexPrimitiveList(const void* vertices, u32 vertexCoun
 				glVertexPointer(3, GL_FLOAT, sizeof(S3DVertexTangents), buffer_offset(0));
 			}
 
-			if (Feature.TextureUnit > 0)
+			if (MultiTextureExtension)
 			{
-				CacheHandler->setClientActiveTexture(GL_TEXTURE0 + 1);
+				extGlClientActiveTexture(GL_TEXTURE1_ARB);
 				glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 				if (vertices)
 					glTexCoordPointer(3, GL_FLOAT, sizeof(S3DVertexTangents), &(static_cast<const S3DVertexTangents*>(vertices))[0].Tangent);
 				else
 					glTexCoordPointer(3, GL_FLOAT, sizeof(S3DVertexTangents), buffer_offset(36));
 
-				CacheHandler->setClientActiveTexture(GL_TEXTURE0 + 2);
+				extGlClientActiveTexture(GL_TEXTURE2_ARB);
 				glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 				if (vertices)
 					glTexCoordPointer(3, GL_FLOAT, sizeof(S3DVertexTangents), &(static_cast<const S3DVertexTangents*>(vertices))[0].Binormal);
@@ -958,20 +1586,24 @@ void COpenGLDriver::drawVertexPrimitiveList(const void* vertices, u32 vertexCoun
 
 	renderArray(indexList, primitiveCount, pType, iType);
 
-	if (Feature.TextureUnit > 0)
+	if (MultiTextureExtension)
 	{
 		if (vType==EVT_TANGENTS)
 		{
-			CacheHandler->setClientActiveTexture(GL_TEXTURE0 + 2);
+			extGlClientActiveTexture(GL_TEXTURE2_ARB);
 			glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 		}
-		if ((vType!=EVT_STANDARD) || CacheHandler->getTextureCache()[1])
+		if ((vType!=EVT_STANDARD) || CurrentTexture[1])
 		{
-			CacheHandler->setClientActiveTexture(GL_TEXTURE0 + 1);
+			extGlClientActiveTexture(GL_TEXTURE1_ARB);
 			glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 		}
-		CacheHandler->setClientActiveTexture(GL_TEXTURE0);
+		extGlClientActiveTexture(GL_TEXTURE0_ARB);
 	}
+	glDisableClientState(GL_COLOR_ARRAY);
+	glDisableClientState(GL_VERTEX_ARRAY);
+	glDisableClientState(GL_NORMAL_ARRAY);
+	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 }
 
 
@@ -1080,19 +1712,14 @@ void COpenGLDriver::renderArray(const void* indexList, u32 primitiveCount,
 			glPointSize(particleSize);
 
 #ifdef GL_ARB_point_sprite
-			if (pType == scene::EPT_POINT_SPRITES && FeatureAvailable[IRR_ARB_point_sprite])
-			{
-				CacheHandler->setActiveTexture(GL_TEXTURE0_ARB);
-				glTexEnvf(GL_POINT_SPRITE_ARB, GL_COORD_REPLACE, GL_TRUE);
-			}
+			if (pType==scene::EPT_POINT_SPRITES && FeatureAvailable[IRR_ARB_point_sprite])
+				glTexEnvf(GL_POINT_SPRITE_ARB,GL_COORD_REPLACE, GL_TRUE);
 #endif
 			glDrawArrays(GL_POINTS, 0, primitiveCount);
 #ifdef GL_ARB_point_sprite
 			if (pType==scene::EPT_POINT_SPRITES && FeatureAvailable[IRR_ARB_point_sprite])
 			{
 				glDisable(GL_POINT_SPRITE_ARB);
-
-				CacheHandler->setActiveTexture(GL_TEXTURE0_ARB);
 				glTexEnvf(GL_POINT_SPRITE_ARB,GL_COORD_REPLACE, GL_FALSE);
 			}
 #endif
@@ -1146,7 +1773,7 @@ void COpenGLDriver::draw2DVertexPrimitiveList(const void* vertices, u32 vertexCo
 		getColorBuffer(vertices, vertexCount, vType);
 
 	// draw everything
-	CacheHandler->getTextureCache().set(0, Material.getTexture(0));
+	this->setActiveTexture(0, Material.getTexture(0));
 	if (Material.MaterialType==EMT_ONETEXTURE_BLEND)
 	{
 		E_BLEND_FACTOR srcFact;
@@ -1159,10 +1786,13 @@ void COpenGLDriver::draw2DVertexPrimitiveList(const void* vertices, u32 vertexCo
 	else
 		setRenderStates2DMode(Material.MaterialType==EMT_TRANSPARENT_VERTEX_ALPHA, (Material.getTexture(0) != 0), Material.MaterialType==EMT_TRANSPARENT_ALPHA_CHANNEL);
 
+	if (MultiTextureExtension)
+		extGlClientActiveTexture(GL_TEXTURE0_ARB);
+
+	glEnableClientState(GL_COLOR_ARRAY);
+	glEnableClientState(GL_VERTEX_ARRAY);
 	if ((pType!=scene::EPT_POINTS) && (pType!=scene::EPT_POINT_SPRITES))
-		CacheHandler->setClientState(true, false, true, true);
-	else
-		CacheHandler->setClientState(true, false, true, false);
+		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 
 //due to missing defines in OSX headers, we have to be more specific with this check
 //#if defined(GL_ARB_vertex_array_bgra) || defined(GL_EXT_vertex_array_bgra)
@@ -1211,9 +1841,9 @@ void COpenGLDriver::draw2DVertexPrimitiveList(const void* vertices, u32 vertexCo
 				glVertexPointer(2, GL_FLOAT, sizeof(S3DVertex), 0);
 			}
 
-			if (Feature.TextureUnit > 0 && CacheHandler->getTextureCache()[1])
+			if (MultiTextureExtension && CurrentTexture[1])
 			{
-				CacheHandler->setClientActiveTexture(GL_TEXTURE0 + 1);
+				extGlClientActiveTexture(GL_TEXTURE1_ARB);
 				glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 				if (vertices)
 					glTexCoordPointer(2, GL_FLOAT, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(vertices))[0].TCoords);
@@ -1234,9 +1864,9 @@ void COpenGLDriver::draw2DVertexPrimitiveList(const void* vertices, u32 vertexCo
 				glVertexPointer(2, GL_FLOAT, sizeof(S3DVertex2TCoords), buffer_offset(0));
 			}
 
-			if (Feature.TextureUnit > 0)
+			if (MultiTextureExtension)
 			{
-				CacheHandler->setClientActiveTexture(GL_TEXTURE0 + 1);
+				extGlClientActiveTexture(GL_TEXTURE1_ARB);
 				glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 				if (vertices)
 					glTexCoordPointer(2, GL_FLOAT, sizeof(S3DVertex2TCoords), &(static_cast<const S3DVertex2TCoords*>(vertices))[0].TCoords2);
@@ -1262,292 +1892,18 @@ void COpenGLDriver::draw2DVertexPrimitiveList(const void* vertices, u32 vertexCo
 
 	renderArray(indexList, primitiveCount, pType, iType);
 
-	if (Feature.TextureUnit > 0)
+	if (MultiTextureExtension)
 	{
-		if ((vType!=EVT_STANDARD) || CacheHandler->getTextureCache()[1])
+		if ((vType!=EVT_STANDARD) || CurrentTexture[1])
 		{
-			CacheHandler->setClientActiveTexture(GL_TEXTURE0 + 1);
+			extGlClientActiveTexture(GL_TEXTURE1_ARB);
 			glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 		}
-		CacheHandler->setClientActiveTexture(GL_TEXTURE0);
+		extGlClientActiveTexture(GL_TEXTURE0_ARB);
 	}
-}
-
-
-void COpenGLDriver::draw2DImage(const video::ITexture* texture, const core::position2d<s32>& destPos,
-	const core::rect<s32>& sourceRect, const core::rect<s32>* clipRect, SColor color,
-	bool useAlphaChannelOfTexture)
-{
-	if (!texture)
-		return;
-
-	if (!sourceRect.isValid())
-		return;
-
-	// clip these coordinates
-	core::rect<s32> targetRect(destPos, sourceRect.getSize());
-	if (clipRect)
-	{
-		targetRect.clipAgainst(*clipRect);
-		if ( targetRect.getWidth() < 0 || targetRect.getHeight() < 0 )
-			return;
-	}
-
-	const core::dimension2d<u32>& renderTargetSize = getCurrentRenderTargetSize();
-	targetRect.clipAgainst( core::rect<s32>(0,0, (s32)renderTargetSize.Width, (s32)renderTargetSize.Height) );
-	if ( targetRect.getWidth() < 0 || targetRect.getHeight() < 0 )
-			return;
-
-	// ok, we've clipped everything.
-	// now draw it.
-	const core::dimension2d<s32> sourceSize(targetRect.getSize());
-	const core::position2d<s32> sourcePos(sourceRect.UpperLeftCorner + (targetRect.UpperLeftCorner-destPos));
-
-	const core::dimension2d<u32>& ss = texture->getOriginalSize();
-	const f32 invW = 1.f / static_cast<f32>(ss.Width);
-	const f32 invH = 1.f / static_cast<f32>(ss.Height);
-	const core::rect<f32> tcoords(
-		sourcePos.X * invW,
-		sourcePos.Y * invH,
-		(sourcePos.X + sourceSize.Width) * invW,
-		(sourcePos.Y + sourceSize.Height) * invH);
-
-	disableTextures(1);
-	if (!CacheHandler->getTextureCache().set(0, texture))
-		return;
-	setRenderStates2DMode(color.getAlpha()<255, true, useAlphaChannelOfTexture);
-
-	Quad2DVertices[0].Color = color;
-	Quad2DVertices[1].Color = color;
-	Quad2DVertices[2].Color = color;
-	Quad2DVertices[3].Color = color;
-
-	Quad2DVertices[0].Pos = core::vector3df((f32)targetRect.UpperLeftCorner.X, (f32)targetRect.UpperLeftCorner.Y, 0.0f);
-	Quad2DVertices[1].Pos = core::vector3df((f32)targetRect.LowerRightCorner.X, (f32)targetRect.UpperLeftCorner.Y, 0.0f);
-	Quad2DVertices[2].Pos = core::vector3df((f32)targetRect.LowerRightCorner.X, (f32)targetRect.LowerRightCorner.Y, 0.0f);
-	Quad2DVertices[3].Pos = core::vector3df((f32)targetRect.UpperLeftCorner.X, (f32)targetRect.LowerRightCorner.Y, 0.0f);
-
-	Quad2DVertices[0].TCoords = core::vector2df(tcoords.UpperLeftCorner.X, tcoords.UpperLeftCorner.Y);
-	Quad2DVertices[1].TCoords = core::vector2df(tcoords.LowerRightCorner.X, tcoords.UpperLeftCorner.Y);
-	Quad2DVertices[2].TCoords = core::vector2df(tcoords.LowerRightCorner.X, tcoords.LowerRightCorner.Y);
-	Quad2DVertices[3].TCoords = core::vector2df(tcoords.UpperLeftCorner.X, tcoords.LowerRightCorner.Y);
-
-	if (!FeatureAvailable[IRR_ARB_vertex_array_bgra] && !FeatureAvailable[IRR_EXT_vertex_array_bgra])
-		getColorBuffer(Quad2DVertices, 4, EVT_STANDARD);
-
-	CacheHandler->setClientState(true, false, true, true);
-
-	glTexCoordPointer(2, GL_FLOAT, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(Quad2DVertices))[0].TCoords);
-	glVertexPointer(2, GL_FLOAT, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(Quad2DVertices))[0].Pos);
-
-#ifdef GL_BGRA
-	const GLint colorSize = (FeatureAvailable[IRR_ARB_vertex_array_bgra] || FeatureAvailable[IRR_EXT_vertex_array_bgra]) ? GL_BGRA : 4;
-#else
-	const GLint colorSize = 4;
-#endif
-	if (FeatureAvailable[IRR_ARB_vertex_array_bgra] || FeatureAvailable[IRR_EXT_vertex_array_bgra])
-		glColorPointer(colorSize, GL_UNSIGNED_BYTE, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(Quad2DVertices))[0].Color);
-	else
-	{
-		_IRR_DEBUG_BREAK_IF(ColorBuffer.size() == 0);
-		glColorPointer(colorSize, GL_UNSIGNED_BYTE, 0, &ColorBuffer[0]);
-	}
-
-	glDrawElements(GL_TRIANGLE_FAN, 4, GL_UNSIGNED_SHORT, Quad2DIndices);
-}
-
-
-void COpenGLDriver::draw2DImage(const video::ITexture* texture, const core::rect<s32>& destRect,
-	const core::rect<s32>& sourceRect, const core::rect<s32>* clipRect,
-	const video::SColor* const colors, bool useAlphaChannelOfTexture)
-{
-	if (!texture)
-		return;
-
-	const core::dimension2d<u32>& ss = texture->getOriginalSize();
-	const f32 invW = 1.f / static_cast<f32>(ss.Width);
-	const f32 invH = 1.f / static_cast<f32>(ss.Height);
-	const core::rect<f32> tcoords(
-		sourceRect.UpperLeftCorner.X * invW,
-		sourceRect.UpperLeftCorner.Y * invH,
-		sourceRect.LowerRightCorner.X * invW,
-		sourceRect.LowerRightCorner.Y *invH);
-
-	const video::SColor temp[4] =
-	{
-		0xFFFFFFFF,
-		0xFFFFFFFF,
-		0xFFFFFFFF,
-		0xFFFFFFFF
-	};
-
-	const video::SColor* const useColor = colors ? colors : temp;
-
-	disableTextures(1);
-	if (!CacheHandler->getTextureCache().set(0, texture))
-		return;
-	setRenderStates2DMode(useColor[0].getAlpha()<255 || useColor[1].getAlpha()<255 ||
-		useColor[2].getAlpha()<255 || useColor[3].getAlpha()<255,
-		true, useAlphaChannelOfTexture);
-
-	if (clipRect)
-	{
-		if (!clipRect->isValid())
-			return;
-
-		glEnable(GL_SCISSOR_TEST);
-		const core::dimension2d<u32>& renderTargetSize = getCurrentRenderTargetSize();
-		glScissor(clipRect->UpperLeftCorner.X, renderTargetSize.Height - clipRect->LowerRightCorner.Y,
-			clipRect->getWidth(), clipRect->getHeight());
-	}
-
-	Quad2DVertices[0].Color = useColor[0];
-	Quad2DVertices[1].Color = useColor[3];
-	Quad2DVertices[2].Color = useColor[2];
-	Quad2DVertices[3].Color = useColor[1];
-
-	Quad2DVertices[0].Pos = core::vector3df((f32)destRect.UpperLeftCorner.X, (f32)destRect.UpperLeftCorner.Y, 0.0f);
-	Quad2DVertices[1].Pos = core::vector3df((f32)destRect.LowerRightCorner.X, (f32)destRect.UpperLeftCorner.Y, 0.0f);
-	Quad2DVertices[2].Pos = core::vector3df((f32)destRect.LowerRightCorner.X, (f32)destRect.LowerRightCorner.Y, 0.0f);
-	Quad2DVertices[3].Pos = core::vector3df((f32)destRect.UpperLeftCorner.X, (f32)destRect.LowerRightCorner.Y, 0.0f);
-
-	Quad2DVertices[0].TCoords = core::vector2df(tcoords.UpperLeftCorner.X, tcoords.UpperLeftCorner.Y);
-	Quad2DVertices[1].TCoords = core::vector2df(tcoords.LowerRightCorner.X, tcoords.UpperLeftCorner.Y);
-	Quad2DVertices[2].TCoords = core::vector2df(tcoords.LowerRightCorner.X, tcoords.LowerRightCorner.Y);
-	Quad2DVertices[3].TCoords = core::vector2df(tcoords.UpperLeftCorner.X, tcoords.LowerRightCorner.Y);
-
-	if (!FeatureAvailable[IRR_ARB_vertex_array_bgra] && !FeatureAvailable[IRR_EXT_vertex_array_bgra])
-		getColorBuffer(Quad2DVertices, 4, EVT_STANDARD);
-
-	CacheHandler->setClientState(true, false, true, true);
-
-	glTexCoordPointer(2, GL_FLOAT, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(Quad2DVertices))[0].TCoords);
-	glVertexPointer(2, GL_FLOAT, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(Quad2DVertices))[0].Pos);
-
-#ifdef GL_BGRA
-	const GLint colorSize = (FeatureAvailable[IRR_ARB_vertex_array_bgra] || FeatureAvailable[IRR_EXT_vertex_array_bgra]) ? GL_BGRA : 4;
-#else
-	const GLint colorSize = 4;
-#endif
-	if (FeatureAvailable[IRR_ARB_vertex_array_bgra] || FeatureAvailable[IRR_EXT_vertex_array_bgra])
-		glColorPointer(colorSize, GL_UNSIGNED_BYTE, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(Quad2DVertices))[0].Color);
-	else
-	{
-		_IRR_DEBUG_BREAK_IF(ColorBuffer.size() == 0);
-		glColorPointer(colorSize, GL_UNSIGNED_BYTE, 0, &ColorBuffer[0]);
-	}
-
-	glDrawElements(GL_TRIANGLE_FAN, 4, GL_UNSIGNED_SHORT, Quad2DIndices);
-
-	if (clipRect)
-		glDisable(GL_SCISSOR_TEST);
-}
-
-
-void COpenGLDriver::draw2DImage(const video::ITexture* texture, u32 layer, bool flip)
-{
-	if (!texture || !CacheHandler->getTextureCache().set(0, texture))
-		return;
-
-	disableTextures(1);
-
-	setRenderStates2DMode(false, true, true);
-
-	CacheHandler->setMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	CacheHandler->setMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-
-	Transformation3DChanged = true;
-
-	CacheHandler->setClientState(true, false, false, true);
-
-	const core::vector3df positionData[4] = {
-		core::vector3df(-1.f, 1.f, 0.f),
-		core::vector3df(1.f, 1.f, 0.f),
-		core::vector3df(1.f, -1.f, 0.f),
-		core::vector3df(-1.f, -1.f, 0.f)
-	};
-
-	glVertexPointer(2, GL_FLOAT, sizeof(core::vector3df), positionData);
-
-	if (texture && texture->getType() == ETT_CUBEMAP)
-	{
-		const core::vector3df texcoordCubeData[6][4] = {
-
-			// GL_TEXTURE_CUBE_MAP_POSITIVE_X
-			{
-				core::vector3df(1.f, 1.f, 1.f),
-				core::vector3df(1.f, 1.f, -1.f),
-				core::vector3df(1.f, -1.f, -1.f),
-				core::vector3df(1.f, -1.f, 1.f)
-			},
-
-			// GL_TEXTURE_CUBE_MAP_NEGATIVE_X
-			{
-				core::vector3df(-1.f, 1.f, -1.f),
-				core::vector3df(-1.f, 1.f, 1.f),
-				core::vector3df(-1.f, -1.f, 1.f),
-				core::vector3df(-1.f, -1.f, -1.f)
-			},
-
-			// GL_TEXTURE_CUBE_MAP_POSITIVE_Y
-			{
-				core::vector3df(-1.f, 1.f, -1.f),
-				core::vector3df(1.f, 1.f, -1.f),
-				core::vector3df(1.f, 1.f, 1.f),
-				core::vector3df(-1.f, 1.f, 1.f)
-			},
-
-			// GL_TEXTURE_CUBE_MAP_NEGATIVE_Y
-			{
-				core::vector3df(-1.f, -1.f, 1.f),
-				core::vector3df(-1.f, -1.f, -1.f),
-				core::vector3df(1.f, -1.f, -1.f),
-				core::vector3df(1.f, -1.f, 1.f)
-			},
-
-			// GL_TEXTURE_CUBE_MAP_POSITIVE_Z
-			{
-				core::vector3df(-1.f, 1.f, 1.f),
-				core::vector3df(-1.f, -1.f, 1.f),
-				core::vector3df(1.f, -1.f, 1.f),
-				core::vector3df(1.f, 1.f, 1.f)
-			},
-
-			// GL_TEXTURE_CUBE_MAP_NEGATIVE_Z
-			{
-				core::vector3df(1.f, 1.f, -1.f),
-				core::vector3df(-1.f, 1.f, -1.f),
-				core::vector3df(-1.f, -1.f, -1.f),
-				core::vector3df(1.f, -1.f, -1.f)
-			}
-		};
-
-		const core::vector3df texcoordData[4] = {
-			texcoordCubeData[layer][(flip) ? 3 : 0],
-			texcoordCubeData[layer][(flip) ? 2 : 1],
-			texcoordCubeData[layer][(flip) ? 1 : 2],
-			texcoordCubeData[layer][(flip) ? 0 : 3]
-		};
-
-		glTexCoordPointer(3, GL_FLOAT, sizeof(core::vector3df), texcoordData);
-	}
-	else
-	{
-		f32 modificator = (flip) ? 1.f : 0.f;
-
-		core::vector2df texcoordData[4] = {
-			core::vector2df(0.f, 0.f + modificator),
-			core::vector2df(1.f, 0.f + modificator),
-			core::vector2df(1.f, 1.f - modificator),
-			core::vector2df(0.f, 1.f - modificator)
-		};
-
-		glTexCoordPointer(2, GL_FLOAT, sizeof(core::vector2df), texcoordData);
-	}
-
-	glDrawElements(GL_TRIANGLE_FAN, 4, GL_UNSIGNED_SHORT, Quad2DIndices);
+	glDisableClientState(GL_COLOR_ARRAY);
+	glDisableClientState(GL_VERTEX_ARRAY);
+	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 }
 
 
@@ -1571,35 +1927,12 @@ void COpenGLDriver::draw2DImageBatch(const video::ITexture* texture,
 	const core::dimension2d<u32>& renderTargetSize = getCurrentRenderTargetSize();
 
 	disableTextures(1);
-	if (!CacheHandler->getTextureCache().set(0, texture))
+	if (!setActiveTexture(0, texture))
 		return;
 	setRenderStates2DMode(color.getAlpha()<255, true, useAlphaChannelOfTexture);
 
-	Quad2DVertices[0].Color = color;
-	Quad2DVertices[1].Color = color;
-	Quad2DVertices[2].Color = color;
-	Quad2DVertices[3].Color = color;
-
-	if (!FeatureAvailable[IRR_ARB_vertex_array_bgra] && !FeatureAvailable[IRR_EXT_vertex_array_bgra])
-		getColorBuffer(Quad2DVertices, 4, EVT_STANDARD);
-
-	CacheHandler->setClientState(true, false, true, true);
-
-	glTexCoordPointer(2, GL_FLOAT, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(Quad2DVertices))[0].TCoords);
-	glVertexPointer(2, GL_FLOAT, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(Quad2DVertices))[0].Pos);
-
-#ifdef GL_BGRA
-	const GLint colorSize=(FeatureAvailable[IRR_ARB_vertex_array_bgra] || FeatureAvailable[IRR_EXT_vertex_array_bgra])?GL_BGRA:4;
-#else
-	const GLint colorSize=4;
-#endif
-	if (FeatureAvailable[IRR_ARB_vertex_array_bgra] || FeatureAvailable[IRR_EXT_vertex_array_bgra])
-		glColorPointer(colorSize, GL_UNSIGNED_BYTE, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(Quad2DVertices))[0].Color);
-	else
-	{
-		_IRR_DEBUG_BREAK_IF(ColorBuffer.size()==0);
-		glColorPointer(colorSize, GL_UNSIGNED_BYTE, 0, &ColorBuffer[0]);
-	}
+	glColor4ub(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha());
+	glBegin(GL_QUADS);
 
 	for (u32 i=0; i<drawCount; ++i)
 	{
@@ -1694,18 +2027,220 @@ void COpenGLDriver::draw2DImageBatch(const video::ITexture* texture,
 
 		const core::rect<s32> poss(targetPos, sourceSize);
 
-		Quad2DVertices[0].Pos = core::vector3df((f32)poss.UpperLeftCorner.X, (f32)poss.UpperLeftCorner.Y, 0.0f);
-		Quad2DVertices[1].Pos = core::vector3df((f32)poss.LowerRightCorner.X, (f32)poss.UpperLeftCorner.Y, 0.0f);
-		Quad2DVertices[2].Pos = core::vector3df((f32)poss.LowerRightCorner.X, (f32)poss.LowerRightCorner.Y, 0.0f);
-		Quad2DVertices[3].Pos = core::vector3df((f32)poss.UpperLeftCorner.X, (f32)poss.LowerRightCorner.Y, 0.0f);
+		glTexCoord2f(tcoords.UpperLeftCorner.X, tcoords.UpperLeftCorner.Y);
+		glVertex2f(GLfloat(poss.UpperLeftCorner.X), GLfloat(poss.UpperLeftCorner.Y));
 
-		Quad2DVertices[0].TCoords = core::vector2df(tcoords.UpperLeftCorner.X, tcoords.UpperLeftCorner.Y);
-		Quad2DVertices[1].TCoords = core::vector2df(tcoords.LowerRightCorner.X, tcoords.UpperLeftCorner.Y);
-		Quad2DVertices[2].TCoords = core::vector2df(tcoords.LowerRightCorner.X, tcoords.LowerRightCorner.Y);
-		Quad2DVertices[3].TCoords = core::vector2df(tcoords.UpperLeftCorner.X, tcoords.LowerRightCorner.Y);
+		glTexCoord2f(tcoords.LowerRightCorner.X, tcoords.UpperLeftCorner.Y);
+		glVertex2f(GLfloat(poss.LowerRightCorner.X), GLfloat(poss.UpperLeftCorner.Y));
 
-		glDrawElements(GL_TRIANGLE_FAN, 4, GL_UNSIGNED_SHORT, Quad2DIndices);
+		glTexCoord2f(tcoords.LowerRightCorner.X, tcoords.LowerRightCorner.Y);
+		glVertex2f(GLfloat(poss.LowerRightCorner.X), GLfloat(poss.LowerRightCorner.Y));
+
+		glTexCoord2f(tcoords.UpperLeftCorner.X, tcoords.LowerRightCorner.Y);
+		glVertex2f(GLfloat(poss.UpperLeftCorner.X), GLfloat(poss.LowerRightCorner.Y));
 	}
+	glEnd();
+}
+
+
+//! draws a 2d image, using a color and the alpha channel of the texture if
+//! desired. The image is drawn at pos, clipped against clipRect (if != 0).
+//! Only the subtexture defined by sourceRect is used.
+void COpenGLDriver::draw2DImage(const video::ITexture* texture,
+				const core::position2d<s32>& pos,
+				const core::rect<s32>& sourceRect,
+				const core::rect<s32>* clipRect, SColor color,
+				bool useAlphaChannelOfTexture)
+{
+	if (!texture)
+		return;
+
+	if (!sourceRect.isValid())
+		return;
+
+	core::position2d<s32> targetPos(pos);
+	core::position2d<s32> sourcePos(sourceRect.UpperLeftCorner);
+	// This needs to be signed as it may go negative.
+	core::dimension2d<s32> sourceSize(sourceRect.getSize());
+	if (clipRect)
+	{
+		if (targetPos.X < clipRect->UpperLeftCorner.X)
+		{
+			sourceSize.Width += targetPos.X - clipRect->UpperLeftCorner.X;
+			if (sourceSize.Width <= 0)
+				return;
+
+			sourcePos.X -= targetPos.X - clipRect->UpperLeftCorner.X;
+			targetPos.X = clipRect->UpperLeftCorner.X;
+		}
+
+		if (targetPos.X + sourceSize.Width > clipRect->LowerRightCorner.X)
+		{
+			sourceSize.Width -= (targetPos.X + sourceSize.Width) - clipRect->LowerRightCorner.X;
+			if (sourceSize.Width <= 0)
+				return;
+		}
+
+		if (targetPos.Y < clipRect->UpperLeftCorner.Y)
+		{
+			sourceSize.Height += targetPos.Y - clipRect->UpperLeftCorner.Y;
+			if (sourceSize.Height <= 0)
+				return;
+
+			sourcePos.Y -= targetPos.Y - clipRect->UpperLeftCorner.Y;
+			targetPos.Y = clipRect->UpperLeftCorner.Y;
+		}
+
+		if (targetPos.Y + sourceSize.Height > clipRect->LowerRightCorner.Y)
+		{
+			sourceSize.Height -= (targetPos.Y + sourceSize.Height) - clipRect->LowerRightCorner.Y;
+			if (sourceSize.Height <= 0)
+				return;
+		}
+	}
+
+	// clip these coordinates
+
+	if (targetPos.X<0)
+	{
+		sourceSize.Width += targetPos.X;
+		if (sourceSize.Width <= 0)
+			return;
+
+		sourcePos.X -= targetPos.X;
+		targetPos.X = 0;
+	}
+
+	const core::dimension2d<u32>& renderTargetSize = getCurrentRenderTargetSize();
+
+	if (targetPos.X + sourceSize.Width > (s32)renderTargetSize.Width)
+	{
+		sourceSize.Width -= (targetPos.X + sourceSize.Width) - renderTargetSize.Width;
+		if (sourceSize.Width <= 0)
+			return;
+	}
+
+	if (targetPos.Y<0)
+	{
+		sourceSize.Height += targetPos.Y;
+		if (sourceSize.Height <= 0)
+			return;
+
+		sourcePos.Y -= targetPos.Y;
+		targetPos.Y = 0;
+	}
+
+	if (targetPos.Y + sourceSize.Height > (s32)renderTargetSize.Height)
+	{
+		sourceSize.Height -= (targetPos.Y + sourceSize.Height) - renderTargetSize.Height;
+		if (sourceSize.Height <= 0)
+			return;
+	}
+
+	// ok, we've clipped everything.
+	// now draw it.
+
+	const core::dimension2d<u32>& ss = texture->getOriginalSize();
+	const f32 invW = 1.f / static_cast<f32>(ss.Width);
+	const f32 invH = 1.f / static_cast<f32>(ss.Height);
+	const core::rect<f32> tcoords(
+			sourcePos.X * invW,
+			sourcePos.Y * invH,
+			(sourcePos.X + sourceSize.Width) * invW,
+			(sourcePos.Y + sourceSize.Height) * invH);
+
+	const core::rect<s32> poss(targetPos, sourceSize);
+
+	disableTextures(1);
+	if (!setActiveTexture(0, texture))
+		return;
+	setRenderStates2DMode(color.getAlpha()<255, true, useAlphaChannelOfTexture);
+
+	glColor4ub(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha());
+	glBegin(GL_QUADS);
+
+	glTexCoord2f(tcoords.UpperLeftCorner.X, tcoords.UpperLeftCorner.Y);
+	glVertex2f(GLfloat(poss.UpperLeftCorner.X), GLfloat(poss.UpperLeftCorner.Y));
+
+	glTexCoord2f(tcoords.LowerRightCorner.X, tcoords.UpperLeftCorner.Y);
+	glVertex2f(GLfloat(poss.LowerRightCorner.X), GLfloat(poss.UpperLeftCorner.Y));
+
+	glTexCoord2f(tcoords.LowerRightCorner.X, tcoords.LowerRightCorner.Y);
+	glVertex2f(GLfloat(poss.LowerRightCorner.X), GLfloat(poss.LowerRightCorner.Y));
+
+	glTexCoord2f(tcoords.UpperLeftCorner.X, tcoords.LowerRightCorner.Y);
+	glVertex2f(GLfloat(poss.UpperLeftCorner.X), GLfloat(poss.LowerRightCorner.Y));
+
+	glEnd();
+}
+
+
+//! The same, but with a four element array of colors, one for each vertex
+void COpenGLDriver::draw2DImage(const video::ITexture* texture, const core::rect<s32>& destRect,
+		const core::rect<s32>& sourceRect, const core::rect<s32>* clipRect,
+		const video::SColor* const colors, bool useAlphaChannelOfTexture)
+{
+	if (!texture)
+		return;
+
+	const core::dimension2d<u32>& ss = texture->getOriginalSize();
+	const f32 invW = 1.f / static_cast<f32>(ss.Width);
+	const f32 invH = 1.f / static_cast<f32>(ss.Height);
+	const core::rect<f32> tcoords(
+			sourceRect.UpperLeftCorner.X * invW,
+			sourceRect.UpperLeftCorner.Y * invH,
+			sourceRect.LowerRightCorner.X * invW,
+			sourceRect.LowerRightCorner.Y *invH);
+
+	const video::SColor temp[4] =
+	{
+		0xFFFFFFFF,
+		0xFFFFFFFF,
+		0xFFFFFFFF,
+		0xFFFFFFFF
+	};
+
+	const video::SColor* const useColor = colors ? colors : temp;
+
+	disableTextures(1);
+	setActiveTexture(0, texture);
+	setRenderStates2DMode(useColor[0].getAlpha()<255 || useColor[1].getAlpha()<255 ||
+			useColor[2].getAlpha()<255 || useColor[3].getAlpha()<255,
+			true, useAlphaChannelOfTexture);
+
+	if (clipRect)
+	{
+		if (!clipRect->isValid())
+			return;
+
+		glEnable(GL_SCISSOR_TEST);
+		const core::dimension2d<u32>& renderTargetSize = getCurrentRenderTargetSize();
+		glScissor(clipRect->UpperLeftCorner.X, renderTargetSize.Height-clipRect->LowerRightCorner.Y,
+			clipRect->getWidth(), clipRect->getHeight());
+	}
+
+	glBegin(GL_QUADS);
+
+	glColor4ub(useColor[0].getRed(), useColor[0].getGreen(), useColor[0].getBlue(), useColor[0].getAlpha());
+	glTexCoord2f(tcoords.UpperLeftCorner.X, tcoords.UpperLeftCorner.Y);
+	glVertex2f(GLfloat(destRect.UpperLeftCorner.X), GLfloat(destRect.UpperLeftCorner.Y));
+
+	glColor4ub(useColor[3].getRed(), useColor[3].getGreen(), useColor[3].getBlue(), useColor[3].getAlpha());
+	glTexCoord2f(tcoords.LowerRightCorner.X, tcoords.UpperLeftCorner.Y);
+	glVertex2f(GLfloat(destRect.LowerRightCorner.X), GLfloat(destRect.UpperLeftCorner.Y));
+
+	glColor4ub(useColor[2].getRed(), useColor[2].getGreen(), useColor[2].getBlue(), useColor[2].getAlpha());
+	glTexCoord2f(tcoords.LowerRightCorner.X, tcoords.LowerRightCorner.Y);
+	glVertex2f(GLfloat(destRect.LowerRightCorner.X), GLfloat(destRect.LowerRightCorner.Y));
+
+	glColor4ub(useColor[1].getRed(), useColor[1].getGreen(), useColor[1].getBlue(), useColor[1].getAlpha());
+	glTexCoord2f(tcoords.UpperLeftCorner.X, tcoords.LowerRightCorner.Y);
+	glVertex2f(GLfloat(destRect.UpperLeftCorner.X), GLfloat(destRect.LowerRightCorner.Y));
+
+	glEnd();
+
+	if (clipRect)
+		glDisable(GL_SCISSOR_TEST);
 }
 
 
@@ -1714,11 +2249,10 @@ void COpenGLDriver::draw2DImageBatch(const video::ITexture* texture,
 //! in one line. All drawings are clipped against clipRect (if != 0).
 //! The subtextures are defined by the array of sourceRects and are chosen
 //! by the indices given.
-void COpenGLDriver::draw2DImageBatch(const video::ITexture* texture,
+void COpenGLDriver::draw2DImage(const video::ITexture* texture,
 				const core::position2d<s32>& pos,
 				const core::array<core::rect<s32> >& sourceRects,
 				const core::array<s32>& indices,
-				s32 kerningWidth,
 				const core::rect<s32>* clipRect, SColor color,
 				bool useAlphaChannelOfTexture)
 {
@@ -1726,10 +2260,11 @@ void COpenGLDriver::draw2DImageBatch(const video::ITexture* texture,
 		return;
 
 	disableTextures(1);
-	if (!CacheHandler->getTextureCache().set(0, texture))
+	if (!setActiveTexture(0, texture))
 		return;
 	setRenderStates2DMode(color.getAlpha()<255, true, useAlphaChannelOfTexture);
 
+	glColor4ub(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha());
 	if (clipRect)
 	{
 		if (!clipRect->isValid())
@@ -1746,32 +2281,6 @@ void COpenGLDriver::draw2DImageBatch(const video::ITexture* texture,
 	const f32 invW = 1.f / static_cast<f32>(ss.Width);
 	const f32 invH = 1.f / static_cast<f32>(ss.Height);
 
-	Quad2DVertices[0].Color = color;
-	Quad2DVertices[1].Color = color;
-	Quad2DVertices[2].Color = color;
-	Quad2DVertices[3].Color = color;
-
-	if (!FeatureAvailable[IRR_ARB_vertex_array_bgra] && !FeatureAvailable[IRR_EXT_vertex_array_bgra])
-		getColorBuffer(Quad2DVertices, 4, EVT_STANDARD);
-
-	CacheHandler->setClientState(true, false, true, true);
-
-	glTexCoordPointer(2, GL_FLOAT, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(Quad2DVertices))[0].TCoords);
-	glVertexPointer(2, GL_FLOAT, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(Quad2DVertices))[0].Pos);
-
-#ifdef GL_BGRA
-	const GLint colorSize=(FeatureAvailable[IRR_ARB_vertex_array_bgra] || FeatureAvailable[IRR_EXT_vertex_array_bgra])?GL_BGRA:4;
-#else
-	const GLint colorSize=4;
-#endif
-	if (FeatureAvailable[IRR_ARB_vertex_array_bgra] || FeatureAvailable[IRR_EXT_vertex_array_bgra])
-		glColorPointer(colorSize, GL_UNSIGNED_BYTE, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(Quad2DVertices))[0].Color);
-	else
-	{
-		_IRR_DEBUG_BREAK_IF(ColorBuffer.size()==0);
-		glColorPointer(colorSize, GL_UNSIGNED_BYTE, 0, &ColorBuffer[0]);
-	}
-
 	for (u32 i=0; i<indices.size(); ++i)
 	{
 		const s32 currentIndex = indices[i];
@@ -1786,21 +2295,23 @@ void COpenGLDriver::draw2DImageBatch(const video::ITexture* texture,
 
 		const core::rect<s32> poss(targetPos, sourceRects[currentIndex].getSize());
 
-		Quad2DVertices[0].Pos = core::vector3df((f32)poss.UpperLeftCorner.X, (f32)poss.UpperLeftCorner.Y, 0.0f);
-		Quad2DVertices[1].Pos = core::vector3df((f32)poss.LowerRightCorner.X, (f32)poss.UpperLeftCorner.Y, 0.0f);
-		Quad2DVertices[2].Pos = core::vector3df((f32)poss.LowerRightCorner.X, (f32)poss.LowerRightCorner.Y, 0.0f);
-		Quad2DVertices[3].Pos = core::vector3df((f32)poss.UpperLeftCorner.X, (f32)poss.LowerRightCorner.Y, 0.0f);
+		glBegin(GL_QUADS);
 
-		Quad2DVertices[0].TCoords = core::vector2df(tcoords.UpperLeftCorner.X, tcoords.UpperLeftCorner.Y);
-		Quad2DVertices[1].TCoords = core::vector2df(tcoords.LowerRightCorner.X, tcoords.UpperLeftCorner.Y);
-		Quad2DVertices[2].TCoords = core::vector2df(tcoords.LowerRightCorner.X, tcoords.LowerRightCorner.Y);
-		Quad2DVertices[3].TCoords = core::vector2df(tcoords.UpperLeftCorner.X, tcoords.LowerRightCorner.Y);
+		glTexCoord2f(tcoords.UpperLeftCorner.X, tcoords.UpperLeftCorner.Y);
+		glVertex2f(GLfloat(poss.UpperLeftCorner.X), GLfloat(poss.UpperLeftCorner.Y));
 
-		glDrawElements(GL_TRIANGLE_FAN, 4, GL_UNSIGNED_SHORT, Quad2DIndices);
+		glTexCoord2f(tcoords.LowerRightCorner.X, tcoords.UpperLeftCorner.Y);
+		glVertex2f(GLfloat(poss.LowerRightCorner.X), GLfloat(poss.UpperLeftCorner.Y));
 
+		glTexCoord2f(tcoords.LowerRightCorner.X, tcoords.LowerRightCorner.Y);
+		glVertex2f(GLfloat(poss.LowerRightCorner.X), GLfloat(poss.LowerRightCorner.Y));
+
+		glTexCoord2f(tcoords.UpperLeftCorner.X, tcoords.LowerRightCorner.Y);
+		glVertex2f(GLfloat(poss.UpperLeftCorner.X), GLfloat(poss.LowerRightCorner.Y));
+
+		glEnd();
 		targetPos.X += sourceRects[currentIndex].getWidth();
 	}
-
 	if (clipRect)
 		glDisable(GL_SCISSOR_TEST);
 }
@@ -1847,37 +2358,24 @@ void COpenGLDriver::draw2DRectangle(const core::rect<s32>& position,
 		colorLeftDown.getAlpha() < 255 ||
 		colorRightDown.getAlpha() < 255, false, false);
 
-	Quad2DVertices[0].Color = colorLeftUp;
-	Quad2DVertices[1].Color = colorRightUp;
-	Quad2DVertices[2].Color = colorRightDown;
-	Quad2DVertices[3].Color = colorLeftDown;
+	glBegin(GL_QUADS);
+	glColor4ub(colorLeftUp.getRed(), colorLeftUp.getGreen(),
+		colorLeftUp.getBlue(), colorLeftUp.getAlpha());
+	glVertex2f(GLfloat(pos.UpperLeftCorner.X), GLfloat(pos.UpperLeftCorner.Y));
 
-	Quad2DVertices[0].Pos = core::vector3df((f32)pos.UpperLeftCorner.X, (f32)pos.UpperLeftCorner.Y, 0.0f);
-	Quad2DVertices[1].Pos = core::vector3df((f32)pos.LowerRightCorner.X, (f32)pos.UpperLeftCorner.Y, 0.0f);
-	Quad2DVertices[2].Pos = core::vector3df((f32)pos.LowerRightCorner.X, (f32)pos.LowerRightCorner.Y, 0.0f);
-	Quad2DVertices[3].Pos = core::vector3df((f32)pos.UpperLeftCorner.X, (f32)pos.LowerRightCorner.Y, 0.0f);
+	glColor4ub(colorRightUp.getRed(), colorRightUp.getGreen(),
+		colorRightUp.getBlue(), colorRightUp.getAlpha());
+	glVertex2f(GLfloat(pos.LowerRightCorner.X), GLfloat(pos.UpperLeftCorner.Y));
 
-	if (!FeatureAvailable[IRR_ARB_vertex_array_bgra] && !FeatureAvailable[IRR_EXT_vertex_array_bgra])
-		getColorBuffer(Quad2DVertices, 4, EVT_STANDARD);
+	glColor4ub(colorRightDown.getRed(), colorRightDown.getGreen(),
+		colorRightDown.getBlue(), colorRightDown.getAlpha());
+	glVertex2f(GLfloat(pos.LowerRightCorner.X), GLfloat(pos.LowerRightCorner.Y));
 
-	CacheHandler->setClientState(true, false, true, false);
+	glColor4ub(colorLeftDown.getRed(), colorLeftDown.getGreen(),
+		colorLeftDown.getBlue(), colorLeftDown.getAlpha());
+	glVertex2f(GLfloat(pos.UpperLeftCorner.X), GLfloat(pos.LowerRightCorner.Y));
 
-	glVertexPointer(2, GL_FLOAT, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(Quad2DVertices))[0].Pos);
-
-#ifdef GL_BGRA
-	const GLint colorSize=(FeatureAvailable[IRR_ARB_vertex_array_bgra] || FeatureAvailable[IRR_EXT_vertex_array_bgra])?GL_BGRA:4;
-#else
-	const GLint colorSize=4;
-#endif
-	if (FeatureAvailable[IRR_ARB_vertex_array_bgra] || FeatureAvailable[IRR_EXT_vertex_array_bgra])
-		glColorPointer(colorSize, GL_UNSIGNED_BYTE, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(Quad2DVertices))[0].Color);
-	else
-	{
-		_IRR_DEBUG_BREAK_IF(ColorBuffer.size()==0);
-		glColorPointer(colorSize, GL_UNSIGNED_BYTE, 0, &ColorBuffer[0]);
-	}
-
-	glDrawElements(GL_TRIANGLE_FAN, 4, GL_UNSIGNED_SHORT, Quad2DIndices);
+	glEnd();
 }
 
 
@@ -1885,8 +2383,6 @@ void COpenGLDriver::draw2DRectangle(const core::rect<s32>& position,
 void COpenGLDriver::draw2DLine(const core::position2d<s32>& start,
 				const core::position2d<s32>& end, SColor color)
 {
-	// TODO: It's not pixel-exact. Reason is the way OpenGL handles line-drawing (search the web for "diamond exit rule").
-
 	if (start==end)
 		drawPixel(start.X, start.Y, color);
 	else
@@ -1894,33 +2390,23 @@ void COpenGLDriver::draw2DLine(const core::position2d<s32>& start,
 		disableTextures();
 		setRenderStates2DMode(color.getAlpha() < 255, false, false);
 
-		Quad2DVertices[0].Color = color;
-		Quad2DVertices[1].Color = color;
-
-		Quad2DVertices[0].Pos = core::vector3df((f32)start.X, (f32)start.Y, 0.0f);
-		Quad2DVertices[1].Pos = core::vector3df((f32)end.X, (f32)end.Y, 0.0f);
-
-		if (!FeatureAvailable[IRR_ARB_vertex_array_bgra] && !FeatureAvailable[IRR_EXT_vertex_array_bgra])
-			getColorBuffer(Quad2DVertices, 2, EVT_STANDARD);
-
-		CacheHandler->setClientState(true, false, true, false);
-
-		glVertexPointer(2, GL_FLOAT, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(Quad2DVertices))[0].Pos);
-
-#ifdef GL_BGRA
-		const GLint colorSize=(FeatureAvailable[IRR_ARB_vertex_array_bgra] || FeatureAvailable[IRR_EXT_vertex_array_bgra])?GL_BGRA:4;
-#else
-		const GLint colorSize=4;
-#endif
-		if (FeatureAvailable[IRR_ARB_vertex_array_bgra] || FeatureAvailable[IRR_EXT_vertex_array_bgra])
-			glColorPointer(colorSize, GL_UNSIGNED_BYTE, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(Quad2DVertices))[0].Color);
-		else
-		{
-			_IRR_DEBUG_BREAK_IF(ColorBuffer.size()==0);
-			glColorPointer(colorSize, GL_UNSIGNED_BYTE, 0, &ColorBuffer[0]);
-		}
-
-		glDrawElements(GL_LINES, 2, GL_UNSIGNED_SHORT, Quad2DIndices);
+		glBegin(GL_LINES);
+		glColor4ub(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha());
+		GLfloat x=(GLfloat)start.X;
+		GLfloat y=(GLfloat)start.Y;
+		if (x>end.X)
+			x += 0.5f;
+		if (y>end.Y)
+			y += 0.5f;
+		glVertex2f(GLfloat(x), GLfloat(y));
+		x=(GLfloat)end.X;
+		y=(GLfloat)end.Y;
+		if (x>start.X)
+			x += 0.5f;
+		if (y>start.Y)
+			y += 0.5f;
+		glVertex2f(GLfloat(x),   GLfloat(y));
+		glEnd();
 	}
 }
 
@@ -1934,42 +2420,55 @@ void COpenGLDriver::drawPixel(u32 x, u32 y, const SColor &color)
 	disableTextures();
 	setRenderStates2DMode(color.getAlpha() < 255, false, false);
 
-	Quad2DVertices[0].Color = color;
+	glBegin(GL_POINTS);
+	glColor4ub(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha());
+	glVertex2i(x, y);
+	glEnd();
+}
 
-	Quad2DVertices[0].Pos = core::vector3df((f32)x, (f32)y, 0.0f);
+bool COpenGLDriver::setActiveTexture(u32 stage, const video::ITexture* texture)
+{
+	if (stage >= MaxSupportedTextures)
+		return false;
 
-	if (!FeatureAvailable[IRR_ARB_vertex_array_bgra] && !FeatureAvailable[IRR_EXT_vertex_array_bgra])
-		getColorBuffer(Quad2DVertices, 1, EVT_STANDARD);
+	if (CurrentTexture[stage]==texture)
+		return true;
 
-	CacheHandler->setClientState(true, false, true, false);
+	if (MultiTextureExtension)
+		extGlActiveTexture(GL_TEXTURE0_ARB + stage);
 
-	glVertexPointer(2, GL_FLOAT, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(Quad2DVertices))[0].Pos);
+	CurrentTexture.set(stage,texture);
 
-#ifdef GL_BGRA
-	const GLint colorSize=(FeatureAvailable[IRR_ARB_vertex_array_bgra] || FeatureAvailable[IRR_EXT_vertex_array_bgra])?GL_BGRA:4;
-#else
-	const GLint colorSize=4;
-#endif
-	if (FeatureAvailable[IRR_ARB_vertex_array_bgra] || FeatureAvailable[IRR_EXT_vertex_array_bgra])
-		glColorPointer(colorSize, GL_UNSIGNED_BYTE, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(Quad2DVertices))[0].Color);
+	if (!texture)
+	{
+		glDisable(GL_TEXTURE_2D);
+		return true;
+	}
 	else
 	{
-		_IRR_DEBUG_BREAK_IF(ColorBuffer.size()==0);
-		glColorPointer(colorSize, GL_UNSIGNED_BYTE, 0, &ColorBuffer[0]);
-	}
+		if (texture->getDriverType() != EDT_OPENGL)
+		{
+			glDisable(GL_TEXTURE_2D);
+			CurrentTexture.set(stage, 0);
+			os::Printer::log("Fatal Error: Tried to set a texture not owned by this driver.", ELL_ERROR);
+			return false;
+		}
 
-	glDrawArrays(GL_POINTS, 0, 1);
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D,
+			static_cast<const COpenGLTexture*>(texture)->getOpenGLTextureName());
+	}
+	return true;
 }
+
 
 //! disables all textures beginning with the optional fromStage parameter. Otherwise all texture stages are disabled.
 //! Returns whether disabling was successful or not.
 bool COpenGLDriver::disableTextures(u32 fromStage)
 {
 	bool result=true;
-	for (u32 i=fromStage; i<Feature.TextureUnit; ++i)
-	{
-		result &= CacheHandler->getTextureCache().set(i, 0);
-	}
+	for (u32 i=fromStage; i<MaxSupportedTextures; ++i)
+		result &= setActiveTexture(i, 0);
 	return result;
 }
 
@@ -2005,22 +2504,13 @@ inline void COpenGLDriver::getGLTextureMatrix(GLfloat *o, const core::matrix4& m
 	o[15] = 1.f;
 }
 
-ITexture* COpenGLDriver::createDeviceDependentTexture(const io::path& name, IImage* image)
+
+//! returns a device dependent texture from a software surface (IImage)
+video::ITexture* COpenGLDriver::createDeviceDependentTexture(IImage* surface, const io::path& name, void* mipmapData)
 {
-	core::array<IImage*> imageArray(1);
-	imageArray.push_back(image);
-
-	COpenGLTexture* texture = new COpenGLTexture(name, imageArray, ETT_2D, this);
-
-	return texture;
+	return new COpenGLTexture(surface, name, mipmapData, this);
 }
 
-ITexture* COpenGLDriver::createDeviceDependentTextureCubemap(const io::path& name, const core::array<IImage*>& image)
-{
-	COpenGLTexture* texture = new COpenGLTexture(name, image, ETT_CUBEMAP, this);
-
-	return texture;
-}
 
 //! Sets a material. All 3d drawing functions draw geometry now using this material.
 void COpenGLDriver::setMaterial(const SMaterial& material)
@@ -2028,16 +2518,17 @@ void COpenGLDriver::setMaterial(const SMaterial& material)
 	Material = material;
 	OverrideMaterial.apply(Material);
 
-	for (u32 i = 0; i < Feature.TextureUnit; ++i)
+	for (s32 i = MaxTextureUnits-1; i>= 0; --i)
 	{
-		CacheHandler->getTextureCache().set(i, material.getTexture(i));
-		setTransform((E_TRANSFORMATION_STATE)(ETS_TEXTURE_0 + i), material.getTextureMatrix(i));
+		setActiveTexture(i, material.getTexture(i));
+		setTransform ((E_TRANSFORMATION_STATE) (ETS_TEXTURE_0 + i),
+				Material.getTextureMatrix(i));
 	}
 }
 
 
 //! prints error if an error happened.
-bool COpenGLDriver::testGLError(int code)
+bool COpenGLDriver::testGLError()
 {
 #ifdef _DEBUG
 	GLenum g = glGetError();
@@ -2046,22 +2537,22 @@ bool COpenGLDriver::testGLError(int code)
 	case GL_NO_ERROR:
 		return false;
 	case GL_INVALID_ENUM:
-		os::Printer::log("GL_INVALID_ENUM", core::stringc(code).c_str(), ELL_ERROR); break;
+		os::Printer::log("GL_INVALID_ENUM", ELL_ERROR); break;
 	case GL_INVALID_VALUE:
-		os::Printer::log("GL_INVALID_VALUE", core::stringc(code).c_str(), ELL_ERROR); break;
+		os::Printer::log("GL_INVALID_VALUE", ELL_ERROR); break;
 	case GL_INVALID_OPERATION:
-		os::Printer::log("GL_INVALID_OPERATION", core::stringc(code).c_str(), ELL_ERROR); break;
+		os::Printer::log("GL_INVALID_OPERATION", ELL_ERROR); break;
 	case GL_STACK_OVERFLOW:
-		os::Printer::log("GL_STACK_OVERFLOW", core::stringc(code).c_str(), ELL_ERROR); break;
+		os::Printer::log("GL_STACK_OVERFLOW", ELL_ERROR); break;
 	case GL_STACK_UNDERFLOW:
-		os::Printer::log("GL_STACK_UNDERFLOW", core::stringc(code).c_str(), ELL_ERROR); break;
+		os::Printer::log("GL_STACK_UNDERFLOW", ELL_ERROR); break;
 	case GL_OUT_OF_MEMORY:
-		os::Printer::log("GL_OUT_OF_MEMORY", core::stringc(code).c_str(), ELL_ERROR); break;
+		os::Printer::log("GL_OUT_OF_MEMORY", ELL_ERROR); break;
 	case GL_TABLE_TOO_LARGE:
-		os::Printer::log("GL_TABLE_TOO_LARGE", core::stringc(code).c_str(), ELL_ERROR); break;
+		os::Printer::log("GL_TABLE_TOO_LARGE", ELL_ERROR); break;
 #if defined(GL_EXT_framebuffer_object)
 	case GL_INVALID_FRAMEBUFFER_OPERATION_EXT:
-		os::Printer::log("GL_INVALID_FRAMEBUFFER_OPERATION", core::stringc(code).c_str(), ELL_ERROR); break;
+		os::Printer::log("GL_INVALID_FRAMEBUFFER_OPERATION", ELL_ERROR); break;
 #endif
 	};
 //	_IRR_DEBUG_BREAK_IF(true);
@@ -2078,17 +2569,15 @@ void COpenGLDriver::setRenderStates3DMode()
 	if (CurrentRenderMode != ERM_3D)
 	{
 		// Reset Texture Stages
-		CacheHandler->setBlend(false);
-		CacheHandler->setAlphaTest(false);
-		CacheHandler->setBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		CacheHandler->setActiveTexture(GL_TEXTURE0_ARB);
-		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+		glDisable(GL_BLEND);
+		glDisable(GL_ALPHA_TEST);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 		// switch back the matrices
-		CacheHandler->setMatrixMode(GL_MODELVIEW);
+		glMatrixMode(GL_MODELVIEW);
 		glLoadMatrixf((Matrices[ETS_VIEW] * Matrices[ETS_WORLD]).pointer());
 
-		CacheHandler->setMatrixMode(GL_PROJECTION);
+		glMatrixMode(GL_PROJECTION);
 		glLoadMatrixf(Matrices[ETS_PROJECTION].pointer());
 
 		ResetRenderStates = true;
@@ -2224,369 +2713,399 @@ GLint COpenGLDriver::getTextureWrapMode(const u8 clamp)
 }
 
 
+void COpenGLDriver::setWrapMode(const SMaterial& material)
+{
+	// texture address mode
+	// Has to be checked always because it depends on the textures
+	for (u32 u=0; u<MaxTextureUnits; ++u)
+	{
+		if (!CurrentTexture[u])
+			continue;
+		if (MultiTextureExtension)
+			extGlActiveTexture(GL_TEXTURE0_ARB + u);
+		else if (u>0)
+			break; // stop loop
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, getTextureWrapMode(material.TextureLayer[u].TextureWrapU));
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, getTextureWrapMode(material.TextureLayer[u].TextureWrapV));
+	}
+}
+
+
 //! Can be called by an IMaterialRenderer to make its work easier.
 void COpenGLDriver::setBasicRenderStates(const SMaterial& material, const SMaterial& lastmaterial,
 	bool resetAllRenderStates)
 {
-	// Fixed pipeline isn't important for shader based materials
-
-	E_OPENGL_FIXED_PIPELINE_STATE tempState = FixedPipelineState;
-
-	if (resetAllRenderStates || tempState == EOFPS_ENABLE || tempState == EOFPS_DISABLE_TO_ENABLE)
+	if (resetAllRenderStates ||
+		lastmaterial.ColorMaterial != material.ColorMaterial)
 	{
-		// material colors
-		if (resetAllRenderStates || tempState == EOFPS_DISABLE_TO_ENABLE ||
-			lastmaterial.ColorMaterial != material.ColorMaterial)
+		switch (material.ColorMaterial)
 		{
-			switch (material.ColorMaterial)
-			{
-			case ECM_NONE:
-				glDisable(GL_COLOR_MATERIAL);
-				break;
-			case ECM_DIFFUSE:
-				glColorMaterial(GL_FRONT_AND_BACK, GL_DIFFUSE);
-				break;
-			case ECM_AMBIENT:
-				glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT);
-				break;
-			case ECM_EMISSIVE:
-				glColorMaterial(GL_FRONT_AND_BACK, GL_EMISSION);
-				break;
-			case ECM_SPECULAR:
-				glColorMaterial(GL_FRONT_AND_BACK, GL_SPECULAR);
-				break;
-			case ECM_DIFFUSE_AND_AMBIENT:
-				glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-				break;
-			}
-			if (material.ColorMaterial != ECM_NONE)
-				glEnable(GL_COLOR_MATERIAL);
+		case ECM_NONE:
+			glDisable(GL_COLOR_MATERIAL);
+			break;
+		case ECM_DIFFUSE:
+			glColorMaterial(GL_FRONT_AND_BACK, GL_DIFFUSE);
+			break;
+		case ECM_AMBIENT:
+			glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT);
+			break;
+		case ECM_EMISSIVE:
+			glColorMaterial(GL_FRONT_AND_BACK, GL_EMISSION);
+			break;
+		case ECM_SPECULAR:
+			glColorMaterial(GL_FRONT_AND_BACK, GL_SPECULAR);
+			break;
+		case ECM_DIFFUSE_AND_AMBIENT:
+			glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
+			break;
 		}
-
-		if (resetAllRenderStates || tempState == EOFPS_DISABLE_TO_ENABLE ||
-			lastmaterial.AmbientColor != material.AmbientColor ||
-			lastmaterial.DiffuseColor != material.DiffuseColor ||
-			lastmaterial.EmissiveColor != material.EmissiveColor ||
-			lastmaterial.ColorMaterial != material.ColorMaterial)
-		{
-			GLfloat color[4];
-
-			const f32 inv = 1.0f / 255.0f;
-
-			if ((material.ColorMaterial != video::ECM_AMBIENT) &&
-				(material.ColorMaterial != video::ECM_DIFFUSE_AND_AMBIENT))
-			{
-				color[0] = material.AmbientColor.getRed() * inv;
-				color[1] = material.AmbientColor.getGreen() * inv;
-				color[2] = material.AmbientColor.getBlue() * inv;
-				color[3] = material.AmbientColor.getAlpha() * inv;
-				glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, color);
-			}
-
-			if ((material.ColorMaterial != video::ECM_DIFFUSE) &&
-				(material.ColorMaterial != video::ECM_DIFFUSE_AND_AMBIENT))
-			{
-				color[0] = material.DiffuseColor.getRed() * inv;
-				color[1] = material.DiffuseColor.getGreen() * inv;
-				color[2] = material.DiffuseColor.getBlue() * inv;
-				color[3] = material.DiffuseColor.getAlpha() * inv;
-				glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, color);
-			}
-
-			if (material.ColorMaterial != video::ECM_EMISSIVE)
-			{
-				color[0] = material.EmissiveColor.getRed() * inv;
-				color[1] = material.EmissiveColor.getGreen() * inv;
-				color[2] = material.EmissiveColor.getBlue() * inv;
-				color[3] = material.EmissiveColor.getAlpha() * inv;
-				glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, color);
-			}
-		}
-
-		if (resetAllRenderStates || tempState == EOFPS_DISABLE_TO_ENABLE ||
-			lastmaterial.SpecularColor != material.SpecularColor ||
-			lastmaterial.Shininess != material.Shininess ||
-			lastmaterial.ColorMaterial != material.ColorMaterial)
-		{
-			GLfloat color[4]={0.f,0.f,0.f,1.f};
-			const f32 inv = 1.0f / 255.0f;
-
-			glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, material.Shininess);
-			// disable Specular colors if no shininess is set
-			if ((material.Shininess != 0.0f) &&
-				(material.ColorMaterial != video::ECM_SPECULAR))
-			{
-#ifdef GL_EXT_separate_specular_color
-				if (FeatureAvailable[IRR_EXT_separate_specular_color])
-					glLightModeli(GL_LIGHT_MODEL_COLOR_CONTROL, GL_SEPARATE_SPECULAR_COLOR);
-#endif
-				color[0] = material.SpecularColor.getRed() * inv;
-				color[1] = material.SpecularColor.getGreen() * inv;
-				color[2] = material.SpecularColor.getBlue() * inv;
-				color[3] = material.SpecularColor.getAlpha() * inv;
-			}
-#ifdef GL_EXT_separate_specular_color
-			else if (FeatureAvailable[IRR_EXT_separate_specular_color])
-				glLightModeli(GL_LIGHT_MODEL_COLOR_CONTROL, GL_SINGLE_COLOR);
-#endif
-			glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, color);
-		}
-
-		// shademode
-		if (resetAllRenderStates || tempState == EOFPS_DISABLE_TO_ENABLE ||
-			lastmaterial.GouraudShading != material.GouraudShading)
-		{
-			if (material.GouraudShading)
-				glShadeModel(GL_SMOOTH);
-			else
-				glShadeModel(GL_FLAT);
-		}
-
-		// lighting
-		if (resetAllRenderStates || tempState == EOFPS_DISABLE_TO_ENABLE ||
-			lastmaterial.Lighting != material.Lighting)
-		{
-			if (material.Lighting)
-				glEnable(GL_LIGHTING);
-			else
-				glDisable(GL_LIGHTING);
-		}
-
-		// fog
-		if (resetAllRenderStates || tempState == EOFPS_DISABLE_TO_ENABLE ||
-			lastmaterial.FogEnable != material.FogEnable)
-		{
-			if (material.FogEnable)
-				glEnable(GL_FOG);
-			else
-				glDisable(GL_FOG);
-		}
-
-		// normalization
-		if (resetAllRenderStates || tempState == EOFPS_DISABLE_TO_ENABLE ||
-			lastmaterial.NormalizeNormals != material.NormalizeNormals)
-		{
-			if (material.NormalizeNormals)
-				glEnable(GL_NORMALIZE);
-			else
-				glDisable(GL_NORMALIZE);
-		}
-
-		// Set fixed pipeline as active.
-		tempState = EOFPS_ENABLE;
-	}
-	else if (tempState == EOFPS_ENABLE_TO_DISABLE)
-	{
-		glDisable(GL_COLOR_MATERIAL);
-		glDisable(GL_LIGHTING);
-		glDisable(GL_FOG);
-		glDisable(GL_NORMALIZE);
-
-		// Set programmable pipeline as active.
-		tempState = EOFPS_DISABLE;
+		if (material.ColorMaterial != ECM_NONE)
+			glEnable(GL_COLOR_MATERIAL);
 	}
 
-	// tempState == EOFPS_DISABLE - driver doesn't calls functions related to fixed pipeline.
+	if (resetAllRenderStates ||
+		lastmaterial.AmbientColor != material.AmbientColor ||
+		lastmaterial.DiffuseColor != material.DiffuseColor ||
+		lastmaterial.EmissiveColor != material.EmissiveColor ||
+		lastmaterial.ColorMaterial != material.ColorMaterial)
+	{
+		GLfloat color[4];
 
-	// fillmode - fixed pipeline call, but it emulate GL_LINES behaviour in rendering, so it stay here.
+		const f32 inv = 1.0f / 255.0f;
+
+		if ((material.ColorMaterial != video::ECM_AMBIENT) &&
+			(material.ColorMaterial != video::ECM_DIFFUSE_AND_AMBIENT))
+		{
+			color[0] = material.AmbientColor.getRed() * inv;
+			color[1] = material.AmbientColor.getGreen() * inv;
+			color[2] = material.AmbientColor.getBlue() * inv;
+			color[3] = material.AmbientColor.getAlpha() * inv;
+			glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, color);
+		}
+
+		if ((material.ColorMaterial != video::ECM_DIFFUSE) &&
+			(material.ColorMaterial != video::ECM_DIFFUSE_AND_AMBIENT))
+		{
+			color[0] = material.DiffuseColor.getRed() * inv;
+			color[1] = material.DiffuseColor.getGreen() * inv;
+			color[2] = material.DiffuseColor.getBlue() * inv;
+			color[3] = material.DiffuseColor.getAlpha() * inv;
+			glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, color);
+		}
+
+		if (material.ColorMaterial != video::ECM_EMISSIVE)
+		{
+			color[0] = material.EmissiveColor.getRed() * inv;
+			color[1] = material.EmissiveColor.getGreen() * inv;
+			color[2] = material.EmissiveColor.getBlue() * inv;
+			color[3] = material.EmissiveColor.getAlpha() * inv;
+			glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, color);
+		}
+	}
+
+	if (resetAllRenderStates ||
+		lastmaterial.SpecularColor != material.SpecularColor ||
+		lastmaterial.Shininess != material.Shininess ||
+		lastmaterial.ColorMaterial != material.ColorMaterial)
+	{
+		GLfloat color[4]={0.f,0.f,0.f,1.f};
+		const f32 inv = 1.0f / 255.0f;
+
+		glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, material.Shininess);
+		// disable Specular colors if no shininess is set
+		if ((material.Shininess != 0.0f) &&
+			(material.ColorMaterial != video::ECM_SPECULAR))
+		{
+#ifdef GL_EXT_separate_specular_color
+			if (FeatureAvailable[IRR_EXT_separate_specular_color])
+				glLightModeli(GL_LIGHT_MODEL_COLOR_CONTROL, GL_SEPARATE_SPECULAR_COLOR);
+#endif
+			color[0] = material.SpecularColor.getRed() * inv;
+			color[1] = material.SpecularColor.getGreen() * inv;
+			color[2] = material.SpecularColor.getBlue() * inv;
+			color[3] = material.SpecularColor.getAlpha() * inv;
+		}
+#ifdef GL_EXT_separate_specular_color
+		else if (FeatureAvailable[IRR_EXT_separate_specular_color])
+			glLightModeli(GL_LIGHT_MODEL_COLOR_CONTROL, GL_SINGLE_COLOR);
+#endif
+		glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, color);
+	}
+
+	// Texture filter
+	// Has to be checked always because it depends on the textures
+	// Filtering has to be set for each texture layer
+	for (u32 i=0; i<MaxTextureUnits; ++i)
+	{
+		if (!CurrentTexture[i])
+			continue;
+		if (MultiTextureExtension)
+			extGlActiveTexture(GL_TEXTURE0_ARB + i);
+		else if (i>0)
+			break;
+
+#ifdef GL_EXT_texture_lod_bias
+		if (FeatureAvailable[IRR_EXT_texture_lod_bias])
+		{
+			if (material.TextureLayer[i].LODBias)
+			{
+				const float tmp = core::clamp(material.TextureLayer[i].LODBias * 0.125f, -MaxTextureLODBias, MaxTextureLODBias);
+				glTexEnvf(GL_TEXTURE_FILTER_CONTROL_EXT, GL_TEXTURE_LOD_BIAS_EXT, tmp);
+			}
+			else
+				glTexEnvf(GL_TEXTURE_FILTER_CONTROL_EXT, GL_TEXTURE_LOD_BIAS_EXT, 0.f);
+		}
+#endif
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
+			(material.TextureLayer[i].BilinearFilter || material.TextureLayer[i].TrilinearFilter) ? GL_LINEAR : GL_NEAREST);
+
+		if (material.UseMipMaps && CurrentTexture[i]->hasMipMaps())
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+				material.TextureLayer[i].TrilinearFilter ? GL_LINEAR_MIPMAP_LINEAR :
+				material.TextureLayer[i].BilinearFilter ? GL_LINEAR_MIPMAP_NEAREST :
+				GL_NEAREST_MIPMAP_NEAREST);
+		else
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+				(material.TextureLayer[i].BilinearFilter || material.TextureLayer[i].TrilinearFilter) ? GL_LINEAR : GL_NEAREST);
+
+#ifdef GL_EXT_texture_filter_anisotropic
+		if (FeatureAvailable[IRR_EXT_texture_filter_anisotropic])
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT,
+			material.TextureLayer[i].AnisotropicFilter>1 ? core::min_(MaxAnisotropy, material.TextureLayer[i].AnisotropicFilter) : 1);
+#endif
+	}
+
+	// fillmode
 	if (resetAllRenderStates || (lastmaterial.Wireframe != material.Wireframe) || (lastmaterial.PointCloud != material.PointCloud))
 		glPolygonMode(GL_FRONT_AND_BACK, material.Wireframe ? GL_LINE : material.PointCloud? GL_POINT : GL_FILL);
 
-	// ZBuffer
-	switch (material.ZBuffer)
+	// shademode
+	if (resetAllRenderStates || (lastmaterial.GouraudShading != material.GouraudShading))
 	{
-	case ECFN_DISABLED:
-		CacheHandler->setDepthTest(false);
-		break;
-	case ECFN_LESSEQUAL:
-		CacheHandler->setDepthTest(true);
-		CacheHandler->setDepthFunc(GL_LEQUAL);
-		break;
-	case ECFN_EQUAL:
-		CacheHandler->setDepthTest(true);
-		CacheHandler->setDepthFunc(GL_EQUAL);
-		break;
-	case ECFN_LESS:
-		CacheHandler->setDepthTest(true);
-		CacheHandler->setDepthFunc(GL_LESS);
-		break;
-	case ECFN_NOTEQUAL:
-		CacheHandler->setDepthTest(true);
-		CacheHandler->setDepthFunc(GL_NOTEQUAL);
-		break;
-	case ECFN_GREATEREQUAL:
-		CacheHandler->setDepthTest(true);
-		CacheHandler->setDepthFunc(GL_GEQUAL);
-		break;
-	case ECFN_GREATER:
-		CacheHandler->setDepthTest(true);
-		CacheHandler->setDepthFunc(GL_GREATER);
-		break;
-	case ECFN_ALWAYS:
-		CacheHandler->setDepthTest(true);
-		CacheHandler->setDepthFunc(GL_ALWAYS);
-		break;
-	case ECFN_NEVER:
-		CacheHandler->setDepthTest(true);
-		CacheHandler->setDepthFunc(GL_NEVER);
-		break;
-	default:
-		break;
+		if (material.GouraudShading)
+			glShadeModel(GL_SMOOTH);
+		else
+			glShadeModel(GL_FLAT);
 	}
 
-	// ZWrite
-	if (getWriteZBuffer(material))
+	// lighting
+	if (resetAllRenderStates || (lastmaterial.Lighting != material.Lighting))
 	{
-		CacheHandler->setDepthMask(true);
-	}
-	else
-	{
-		CacheHandler->setDepthMask(false);
+		if (material.Lighting)
+			glEnable(GL_LIGHTING);
+		else
+			glDisable(GL_LIGHTING);
 	}
 
-	// Back face culling
-	if ((material.FrontfaceCulling) && (material.BackfaceCulling))
+	// zbuffer
+	if (resetAllRenderStates || lastmaterial.ZBuffer != material.ZBuffer)
 	{
-		CacheHandler->setCullFaceFunc(GL_FRONT_AND_BACK);
-		CacheHandler->setCullFace(true);
+		switch (material.ZBuffer)
+		{
+			case ECFN_NEVER:
+				glDisable(GL_DEPTH_TEST);
+				break;
+			case ECFN_LESSEQUAL:
+				glEnable(GL_DEPTH_TEST);
+				glDepthFunc(GL_LEQUAL);
+				break;
+			case ECFN_EQUAL:
+				glEnable(GL_DEPTH_TEST);
+				glDepthFunc(GL_EQUAL);
+				break;
+			case ECFN_LESS:
+				glEnable(GL_DEPTH_TEST);
+				glDepthFunc(GL_LESS);
+				break;
+			case ECFN_NOTEQUAL:
+				glEnable(GL_DEPTH_TEST);
+				glDepthFunc(GL_NOTEQUAL);
+				break;
+			case ECFN_GREATEREQUAL:
+				glEnable(GL_DEPTH_TEST);
+				glDepthFunc(GL_GEQUAL);
+				break;
+			case ECFN_GREATER:
+				glEnable(GL_DEPTH_TEST);
+				glDepthFunc(GL_GREATER);
+				break;
+			case ECFN_ALWAYS:
+				glEnable(GL_DEPTH_TEST);
+				glDepthFunc(GL_ALWAYS);
+				break;
+		}
 	}
-	else if (material.BackfaceCulling)
+
+	// zwrite
+//	if (resetAllRenderStates || lastmaterial.ZWriteEnable != material.ZWriteEnable)
 	{
-		CacheHandler->setCullFaceFunc(GL_BACK);
-		CacheHandler->setCullFace(true);
+		if (material.ZWriteEnable && (AllowZWriteOnTransparent || !material.isTransparent()))
+		{
+			glDepthMask(GL_TRUE);
+		}
+		else
+			glDepthMask(GL_FALSE);
 	}
-	else if (material.FrontfaceCulling)
+
+	// back face culling
+	if (resetAllRenderStates || (lastmaterial.FrontfaceCulling != material.FrontfaceCulling) || (lastmaterial.BackfaceCulling != material.BackfaceCulling))
 	{
-		CacheHandler->setCullFaceFunc(GL_FRONT);
-		CacheHandler->setCullFace(true);
+		if ((material.FrontfaceCulling) && (material.BackfaceCulling))
+		{
+			glCullFace(GL_FRONT_AND_BACK);
+			glEnable(GL_CULL_FACE);
+		}
+		else
+		if (material.BackfaceCulling)
+		{
+			glCullFace(GL_BACK);
+			glEnable(GL_CULL_FACE);
+		}
+		else
+		if (material.FrontfaceCulling)
+		{
+			glCullFace(GL_FRONT);
+			glEnable(GL_CULL_FACE);
+		}
+		else
+			glDisable(GL_CULL_FACE);
 	}
-	else
+
+	// fog
+	if (resetAllRenderStates || lastmaterial.FogEnable != material.FogEnable)
 	{
-		CacheHandler->setCullFace(false);
+		if (material.FogEnable)
+			glEnable(GL_FOG);
+		else
+			glDisable(GL_FOG);
+	}
+
+	// normalization
+	if (resetAllRenderStates || lastmaterial.NormalizeNormals != material.NormalizeNormals)
+	{
+		if (material.NormalizeNormals)
+			glEnable(GL_NORMALIZE);
+		else
+			glDisable(GL_NORMALIZE);
 	}
 
 	// Color Mask
-	CacheHandler->setColorMask(material.ColorMask);
-
-	// Blend Equation
-    if (material.BlendOperation == EBO_NONE)
-        CacheHandler->setBlend(false);
-    else
-    {
-        CacheHandler->setBlend(true);
-
-#if defined(GL_EXT_blend_subtract) || defined(GL_EXT_blend_minmax) || defined(GL_EXT_blend_logic_op) || defined(GL_VERSION_1_4)
-        if (queryFeature(EVDF_BLEND_OPERATIONS))
-        {
-            switch (material.BlendOperation)
-            {
-            case EBO_SUBTRACT:
-#if defined(GL_VERSION_1_4)
-                CacheHandler->setBlendEquation(GL_FUNC_SUBTRACT);
-#elif defined(GL_EXT_blend_subtract)
-                CacheHandler->setBlendEquation(GL_FUNC_SUBTRACT_EXT);
-#endif
-                break;
-            case EBO_REVSUBTRACT:
-#if defined(GL_VERSION_1_4)
-                CacheHandler->setBlendEquation(GL_FUNC_REVERSE_SUBTRACT);
-#elif defined(GL_EXT_blend_subtract)
-                CacheHandler->setBlendEquation(GL_FUNC_REVERSE_SUBTRACT_EXT);
-#endif
-                break;
-            case EBO_MIN:
-#if defined(GL_VERSION_1_4)
-                CacheHandler->setBlendEquation(GL_MIN);
-#elif defined(GL_EXT_blend_minmax)
-                CacheHandler->setBlendEquation(GL_MIN_EXT);
-#endif
-                break;
-            case EBO_MAX:
-#if defined(GL_VERSION_1_4)
-                CacheHandler->setBlendEquation(GL_MAX);
-#elif defined(GL_EXT_blend_minmax)
-                CacheHandler->setBlendEquation(GL_MAX_EXT);
-#endif
-                break;
-            case EBO_MIN_FACTOR:
-#if defined(GL_AMD_blend_minmax_factor)
-                if (FeatureAvailable[IRR_AMD_blend_minmax_factor])
-                    CacheHandler->setBlendEquation(GL_FACTOR_MIN_AMD);
-#endif
-				// fallback in case of missing extension
-#if defined(GL_VERSION_1_4)
-#if defined(GL_AMD_blend_minmax_factor)
-                else
-#endif
-                    CacheHandler->setBlendEquation(GL_MIN);
-#endif
-                break;
-            case EBO_MAX_FACTOR:
-#if defined(GL_AMD_blend_minmax_factor)
-                if (FeatureAvailable[IRR_AMD_blend_minmax_factor])
-                    CacheHandler->setBlendEquation(GL_FACTOR_MAX_AMD);
-#endif
-				// fallback in case of missing extension
-#if defined(GL_VERSION_1_4)
-#if defined(GL_AMD_blend_minmax_factor)
-                else
-#endif
-                    CacheHandler->setBlendEquation(GL_MAX);
-#endif
-                break;
-            case EBO_MIN_ALPHA:
-#if defined(GL_SGIX_blend_alpha_minmax)
-                if (FeatureAvailable[IRR_SGIX_blend_alpha_minmax])
-                    CacheHandler->setBlendEquation(GL_ALPHA_MIN_SGIX);
-                // fallback in case of missing extension
-                else
-                    if (FeatureAvailable[IRR_EXT_blend_minmax])
-                        CacheHandler->setBlendEquation(GL_MIN_EXT);
-#endif
-                break;
-            case EBO_MAX_ALPHA:
-#if defined(GL_SGIX_blend_alpha_minmax)
-                if (FeatureAvailable[IRR_SGIX_blend_alpha_minmax])
-                    CacheHandler->setBlendEquation(GL_ALPHA_MAX_SGIX);
-                // fallback in case of missing extension
-                else
-                    if (FeatureAvailable[IRR_EXT_blend_minmax])
-                        CacheHandler->setBlendEquation(GL_MAX_EXT);
-#endif
-                break;
-            default:
-#if defined(GL_VERSION_1_4)
-                CacheHandler->setBlendEquation(GL_FUNC_ADD);
-#elif defined(GL_EXT_blend_subtract) || defined(GL_EXT_blend_minmax) || defined(GL_EXT_blend_logic_op)
-                CacheHandler->setBlendEquation(GL_FUNC_ADD_EXT);
-#endif
-                break;
-            }
-		}
-#endif
+	if (resetAllRenderStates || lastmaterial.ColorMask != material.ColorMask)
+	{
+		glColorMask(
+			(material.ColorMask & ECP_RED)?GL_TRUE:GL_FALSE,
+			(material.ColorMask & ECP_GREEN)?GL_TRUE:GL_FALSE,
+			(material.ColorMask & ECP_BLUE)?GL_TRUE:GL_FALSE,
+			(material.ColorMask & ECP_ALPHA)?GL_TRUE:GL_FALSE);
 	}
 
-    // Blend Factor
-	if (IR(material.BlendFactor) & 0xFFFFFFFF)
+	if (queryFeature(EVDF_BLEND_OPERATIONS) &&
+		(resetAllRenderStates|| lastmaterial.BlendOperation != material.BlendOperation))
 	{
-        E_BLEND_FACTOR srcRGBFact = EBF_ZERO;
-        E_BLEND_FACTOR dstRGBFact = EBF_ZERO;
-        E_BLEND_FACTOR srcAlphaFact = EBF_ZERO;
-        E_BLEND_FACTOR dstAlphaFact = EBF_ZERO;
-        E_MODULATE_FUNC modulo = EMFN_MODULATE_1X;
-        u32 alphaSource = 0;
-
-        unpack_textureBlendFuncSeparate(srcRGBFact, dstRGBFact, srcAlphaFact, dstAlphaFact, modulo, alphaSource, material.BlendFactor);
-
-        if (queryFeature(EVDF_BLEND_SEPARATE))
-        {
-            CacheHandler->setBlendFuncSeparate(getGLBlend(srcRGBFact), getGLBlend(dstRGBFact),
-                getGLBlend(srcAlphaFact), getGLBlend(dstAlphaFact));
-        }
-        else
-        {
-            CacheHandler->setBlendFunc(getGLBlend(srcRGBFact), getGLBlend(dstRGBFact));
-        }
+		if (material.BlendOperation==EBO_NONE)
+			glDisable(GL_BLEND);
+		else
+		{
+			glEnable(GL_BLEND);
+#if defined(GL_EXT_blend_subtract) || defined(GL_EXT_blend_minmax) || defined(GL_EXT_blend_logic_op) || defined(GL_VERSION_1_2)
+			switch (material.BlendOperation)
+			{
+			case EBO_SUBTRACT:
+#if defined(GL_EXT_blend_subtract)
+				if (FeatureAvailable[IRR_EXT_blend_subtract] || (Version>=120))
+					extGlBlendEquation(GL_FUNC_SUBTRACT_EXT);
+#elif defined(GL_VERSION_1_2)
+				if (Version>=120)
+					extGlBlendEquation(GL_FUNC_SUBTRACT);
+#endif
+				break;
+			case EBO_REVSUBTRACT:
+#if defined(GL_EXT_blend_subtract)
+				if (FeatureAvailable[IRR_EXT_blend_subtract] || (Version>=120))
+					extGlBlendEquation(GL_FUNC_REVERSE_SUBTRACT_EXT);
+#elif defined(GL_VERSION_1_2)
+				if (Version>=120)
+					extGlBlendEquation(GL_FUNC_REVERSE_SUBTRACT);
+#endif
+				break;
+			case EBO_MIN:
+#if defined(GL_EXT_blend_minmax)
+				if (FeatureAvailable[IRR_EXT_blend_minmax] || (Version>=120))
+					extGlBlendEquation(GL_MIN_EXT);
+#elif defined(GL_VERSION_1_2)
+				if (Version>=120)
+					extGlBlendEquation(GL_MIN);
+#endif
+				break;
+			case EBO_MAX:
+#if defined(GL_EXT_blend_minmax)
+				if (FeatureAvailable[IRR_EXT_blend_minmax] || (Version>=120))
+					extGlBlendEquation(GL_MAX_EXT);
+#elif defined(GL_VERSION_1_2)
+				if (Version>=120)
+					extGlBlendEquation(GL_MAX);
+#endif
+				break;
+			case EBO_MIN_FACTOR:
+#if defined(GL_AMD_blend_minmax_factor)
+				if (FeatureAvailable[IRR_AMD_blend_minmax_factor])
+					extGlBlendEquation(GL_FACTOR_MIN_AMD);
+#endif
+				// fallback in case of missing extension
+#if defined(GL_VERSION_1_2)
+#if defined(GL_AMD_blend_minmax_factor)
+				else
+#endif
+				if (Version>=120)
+					extGlBlendEquation(GL_MIN);
+#endif
+				break;
+			case EBO_MAX_FACTOR:
+#if defined(GL_AMD_blend_minmax_factor)
+				if (FeatureAvailable[IRR_AMD_blend_minmax_factor])
+					extGlBlendEquation(GL_FACTOR_MAX_AMD);
+#endif
+				// fallback in case of missing extension
+#if defined(GL_VERSION_1_2)
+#if defined(GL_AMD_blend_minmax_factor)
+				else
+#endif
+				if (Version>=120)
+					extGlBlendEquation(GL_MAX);
+#endif
+				break;
+			case EBO_MIN_ALPHA:
+#if defined(GL_SGIX_blend_alpha_minmax)
+				if (FeatureAvailable[IRR_SGIX_blend_alpha_minmax])
+					extGlBlendEquation(GL_ALPHA_MIN_SGIX);
+				// fallback in case of missing extension
+				else
+					if (FeatureAvailable[IRR_EXT_blend_minmax])
+						extGlBlendEquation(GL_MIN_EXT);
+#endif
+				break;
+			case EBO_MAX_ALPHA:
+#if defined(GL_SGIX_blend_alpha_minmax)
+				if (FeatureAvailable[IRR_SGIX_blend_alpha_minmax])
+					extGlBlendEquation(GL_ALPHA_MAX_SGIX);
+				// fallback in case of missing extension
+				else
+					if (FeatureAvailable[IRR_EXT_blend_minmax])
+						extGlBlendEquation(GL_MAX_EXT);
+#endif
+				break;
+			default:
+#if defined(GL_EXT_blend_subtract) || defined(GL_EXT_blend_minmax) || defined(GL_EXT_blend_logic_op)
+				extGlBlendEquation(GL_FUNC_ADD_EXT);
+#elif defined(GL_VERSION_1_2)
+				extGlBlendEquation(GL_FUNC_ADD);
+#endif
+				break;
+			}
+#endif
+		}
 	}
 
 	// Polygon Offset
@@ -2666,167 +3185,11 @@ void COpenGLDriver::setBasicRenderStates(const SMaterial& material, const SMater
 		}
 	}
 
-	// Texture parameters
-	setTextureRenderStates(material, resetAllRenderStates);
+	setWrapMode(material);
 
-	// set current fixed pipeline state
-	FixedPipelineState = tempState;
-}
-
-//! Compare in SMaterial doesn't check texture parameters, so we should call this on each OnRender call.
-void COpenGLDriver::setTextureRenderStates(const SMaterial& material, bool resetAllRenderstates)
-{
-	// Set textures to TU/TIU and apply filters to them
-
-	for (s32 i = Feature.TextureUnit - 1; i >= 0; --i)
-	{
-		bool fixedPipeline = false;
-
-		if (FixedPipelineState == EOFPS_ENABLE || FixedPipelineState == EOFPS_DISABLE_TO_ENABLE)
-			fixedPipeline = true;
-
-		const COpenGLTexture* tmpTexture = CacheHandler->getTextureCache().get(i);
-
-		if (tmpTexture)
-		{
-			CacheHandler->setActiveTexture(GL_TEXTURE0 + i);
-
-			if (fixedPipeline)
-			{
-				const bool isRTT = tmpTexture->isRenderTarget();
-
-				CacheHandler->setMatrixMode(GL_TEXTURE);
-
-				if (!isRTT && Matrices[ETS_TEXTURE_0 + i].isIdentity())
-					glLoadIdentity();
-				else
-				{
-					GLfloat glmat[16];
-					if (isRTT)
-						getGLTextureMatrix(glmat, Matrices[ETS_TEXTURE_0 + i] * TextureFlipMatrix);
-					else
-						getGLTextureMatrix(glmat, Matrices[ETS_TEXTURE_0 + i]);
-					glLoadMatrixf(glmat);
-				}
-			}
-
-			const GLenum tmpType = tmpTexture->getOpenGLTextureType();
-
-			COpenGLTexture::SStatesCache& statesCache = tmpTexture->getStatesCache();
-
-			if (resetAllRenderstates)
-				statesCache.IsCached = false;
-
-#ifdef GL_VERSION_2_1
-			if (Version >= 210)
-			{
-				if (!statesCache.IsCached || material.TextureLayer[i].LODBias != statesCache.LODBias)
-				{
-					if (material.TextureLayer[i].LODBias)
-					{
-						const float tmp = core::clamp(material.TextureLayer[i].LODBias * 0.125f, -MaxTextureLODBias, MaxTextureLODBias);
-						glTexParameterf(tmpType, GL_TEXTURE_LOD_BIAS, tmp);
-					}
-					else
-						glTexParameterf(tmpType, GL_TEXTURE_LOD_BIAS, 0.f);
-
-					statesCache.LODBias = material.TextureLayer[i].LODBias;
-				}
-			}
-			else if (FeatureAvailable[IRR_EXT_texture_lod_bias])
-			{
-				if (material.TextureLayer[i].LODBias)
-				{
-					const float tmp = core::clamp(material.TextureLayer[i].LODBias * 0.125f, -MaxTextureLODBias, MaxTextureLODBias);
-					glTexEnvf(GL_TEXTURE_FILTER_CONTROL_EXT, GL_TEXTURE_LOD_BIAS_EXT, tmp);
-				}
-				else
-					glTexEnvf(GL_TEXTURE_FILTER_CONTROL_EXT, GL_TEXTURE_LOD_BIAS_EXT, 0.f);
-			}
-#elif defined(GL_EXT_texture_lod_bias)
-			if (FeatureAvailable[IRR_EXT_texture_lod_bias])
-			{
-				if (material.TextureLayer[i].LODBias)
-				{
-					const float tmp = core::clamp(material.TextureLayer[i].LODBias * 0.125f, -MaxTextureLODBias, MaxTextureLODBias);
-					glTexEnvf(GL_TEXTURE_FILTER_CONTROL_EXT, GL_TEXTURE_LOD_BIAS_EXT, tmp);
-				}
-				else
-					glTexEnvf(GL_TEXTURE_FILTER_CONTROL_EXT, GL_TEXTURE_LOD_BIAS_EXT, 0.f);
-			}
-#endif
-
-			if (!statesCache.IsCached || material.TextureLayer[i].BilinearFilter != statesCache.BilinearFilter ||
-				material.TextureLayer[i].TrilinearFilter != statesCache.TrilinearFilter)
-			{
-				glTexParameteri(tmpType, GL_TEXTURE_MAG_FILTER,
-					(material.TextureLayer[i].BilinearFilter || material.TextureLayer[i].TrilinearFilter) ? GL_LINEAR : GL_NEAREST);
-
-				statesCache.BilinearFilter = material.TextureLayer[i].BilinearFilter;
-				statesCache.TrilinearFilter = material.TextureLayer[i].TrilinearFilter;
-			}
-
-			if (material.UseMipMaps && tmpTexture->hasMipMaps())
-			{
-				if (!statesCache.IsCached || material.TextureLayer[i].BilinearFilter != statesCache.BilinearFilter ||
-					material.TextureLayer[i].TrilinearFilter != statesCache.TrilinearFilter || !statesCache.MipMapStatus)
-				{
-					glTexParameteri(tmpType, GL_TEXTURE_MIN_FILTER,
-						material.TextureLayer[i].TrilinearFilter ? GL_LINEAR_MIPMAP_LINEAR :
-						material.TextureLayer[i].BilinearFilter ? GL_LINEAR_MIPMAP_NEAREST :
-						GL_NEAREST_MIPMAP_NEAREST);
-
-					statesCache.BilinearFilter = material.TextureLayer[i].BilinearFilter;
-					statesCache.TrilinearFilter = material.TextureLayer[i].TrilinearFilter;
-					statesCache.MipMapStatus = true;
-				}
-			}
-			else
-			{
-				if (!statesCache.IsCached || material.TextureLayer[i].BilinearFilter != statesCache.BilinearFilter ||
-					material.TextureLayer[i].TrilinearFilter != statesCache.TrilinearFilter || statesCache.MipMapStatus)
-				{
-					glTexParameteri(tmpType, GL_TEXTURE_MIN_FILTER,
-						(material.TextureLayer[i].BilinearFilter || material.TextureLayer[i].TrilinearFilter) ? GL_LINEAR : GL_NEAREST);
-
-					statesCache.BilinearFilter = material.TextureLayer[i].BilinearFilter;
-					statesCache.TrilinearFilter = material.TextureLayer[i].TrilinearFilter;
-					statesCache.MipMapStatus = false;
-				}
-			}
-
-#ifdef GL_EXT_texture_filter_anisotropic
-			if (FeatureAvailable[IRR_EXT_texture_filter_anisotropic] &&
-				(!statesCache.IsCached || material.TextureLayer[i].AnisotropicFilter != statesCache.AnisotropicFilter))
-			{
-				glTexParameteri(tmpType, GL_TEXTURE_MAX_ANISOTROPY_EXT,
-					material.TextureLayer[i].AnisotropicFilter > 1 ? core::min_(MaxAnisotropy, material.TextureLayer[i].AnisotropicFilter) : 1);
-
-				statesCache.AnisotropicFilter = material.TextureLayer[i].AnisotropicFilter;
-			}
-#endif
-
-			if (!statesCache.IsCached || material.TextureLayer[i].TextureWrapU != statesCache.WrapU)
-			{
-				glTexParameteri(tmpType, GL_TEXTURE_WRAP_S, getTextureWrapMode(material.TextureLayer[i].TextureWrapU));
-				statesCache.WrapU = material.TextureLayer[i].TextureWrapU;
-			}
-
-			if (!statesCache.IsCached || material.TextureLayer[i].TextureWrapV != statesCache.WrapV)
-			{
-				glTexParameteri(tmpType, GL_TEXTURE_WRAP_T, getTextureWrapMode(material.TextureLayer[i].TextureWrapV));
-				statesCache.WrapV = material.TextureLayer[i].TextureWrapV;
-			}
-
-			if (!statesCache.IsCached || material.TextureLayer[i].TextureWrapW != statesCache.WrapW)
-			{
-				glTexParameteri(tmpType, GL_TEXTURE_WRAP_R, getTextureWrapMode(material.TextureLayer[i].TextureWrapW));
-				statesCache.WrapW = material.TextureLayer[i].TextureWrapW;
-			}
-
-			statesCache.IsCached = true;
-		}
-	}
+	// be sure to leave in texture stage 0
+	if (MultiTextureExtension)
+		extGlActiveTexture(GL_TEXTURE0_ARB);
 }
 
 
@@ -2842,14 +3205,6 @@ void COpenGLDriver::enableMaterial2D(bool enable)
 //! sets the needed renderstates
 void COpenGLDriver::setRenderStates2DMode(bool alpha, bool texture, bool alphaChannel)
 {
-	// 2d methods uses fixed pipeline
-	if (FixedPipelineState == COpenGLDriver::EOFPS_DISABLE)
-		FixedPipelineState = COpenGLDriver::EOFPS_DISABLE_TO_ENABLE;
-	else
-		FixedPipelineState = COpenGLDriver::EOFPS_ENABLE;
-
-	bool resetAllRenderStates = false;
-
 	if (CurrentRenderMode != ERM_2D || Transformation3DChanged)
 	{
 		// unset last 3d material
@@ -2858,10 +3213,9 @@ void COpenGLDriver::setRenderStates2DMode(bool alpha, bool texture, bool alphaCh
 			if (static_cast<u32>(LastMaterial.MaterialType) < MaterialRenderers.size())
 				MaterialRenderers[LastMaterial.MaterialType].Renderer->OnUnsetMaterial();
 		}
-
 		if (Transformation3DChanged)
 		{
-			CacheHandler->setMatrixMode(GL_PROJECTION);
+			glMatrixMode(GL_PROJECTION);
 
 			const core::dimension2d<u32>& renderTargetSize = getCurrentRenderTargetSize();
 			core::matrix4 m(core::matrix4::EM4CONST_NOTHING);
@@ -2869,68 +3223,71 @@ void COpenGLDriver::setRenderStates2DMode(bool alpha, bool texture, bool alphaCh
 			m.setTranslation(core::vector3df(-1,1,0));
 			glLoadMatrixf(m.pointer());
 
-			CacheHandler->setMatrixMode(GL_MODELVIEW);
+			glMatrixMode(GL_MODELVIEW);
 			glLoadIdentity();
 			glTranslatef(0.375f, 0.375f, 0.0f);
 
+			// Make sure we set first texture matrix
+			if (MultiTextureExtension)
+				extGlActiveTexture(GL_TEXTURE0_ARB);
+
 			Transformation3DChanged = false;
 		}
-
-		CacheHandler->setBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
+		if (!OverrideMaterial2DEnabled)
+		{
+			setBasicRenderStates(InitMaterial2D, LastMaterial, true);
+			LastMaterial = InitMaterial2D;
+		}
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 #ifdef GL_EXT_clip_volume_hint
 		if (FeatureAvailable[IRR_EXT_clip_volume_hint])
 			glHint(GL_CLIP_VOLUME_CLIPPING_HINT_EXT, GL_FASTEST);
 #endif
 
-		resetAllRenderStates = true;
 	}
-
-	SMaterial currentMaterial = (!OverrideMaterial2DEnabled) ? InitMaterial2D : OverrideMaterial2D;
-	currentMaterial.Lighting = false;
-
-	if (texture)
+	if (OverrideMaterial2DEnabled)
 	{
-		setTransform(ETS_TEXTURE_0, core::IdentityMatrix);
-
-		// Due to the transformation change, the previous line would call a reset each frame
-		// but we can safely reset the variable as it was false before
-		Transformation3DChanged = false;
+		OverrideMaterial2D.Lighting=false;
+		setBasicRenderStates(OverrideMaterial2D, LastMaterial, false);
+		LastMaterial = OverrideMaterial2D;
 	}
-	else
-	{
-		CacheHandler->getTextureCache().set(0, 0);
-	}
-
-	setBasicRenderStates(currentMaterial, LastMaterial, resetAllRenderStates);
-
-	LastMaterial = currentMaterial;
 
 	// no alphaChannel without texture
 	alphaChannel &= texture;
 
 	if (alphaChannel || alpha)
 	{
-		CacheHandler->setBlend(true);
-		CacheHandler->setAlphaTest(true);
-		CacheHandler->setAlphaFunc(GL_GREATER, 0.f);
+		glEnable(GL_BLEND);
+		glEnable(GL_ALPHA_TEST);
+		glAlphaFunc(GL_GREATER, 0.f);
 	}
 	else
 	{
-		CacheHandler->setBlend(false);
-		CacheHandler->setAlphaTest(false);
+		glDisable(GL_BLEND);
+		glDisable(GL_ALPHA_TEST);
 	}
 
 	if (texture)
 	{
-		CacheHandler->setActiveTexture(GL_TEXTURE0_ARB);
+		if (!OverrideMaterial2DEnabled)
+		{
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		}
+		Material.setTexture(0, const_cast<video::ITexture*>(CurrentTexture[0]));
+		setTransform(ETS_TEXTURE_0, core::IdentityMatrix);
+		// Due to the transformation change, the previous line would call a reset each frame
+		// but we can safely reset the variable as it was false before
+		Transformation3DChanged=false;
 
 		if (alphaChannel)
 		{
 			// if alpha and alpha texture just modulate, otherwise use only the alpha channel
 			if (alpha)
 			{
-				glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+				glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 			}
 			else
 			{
@@ -2938,26 +3295,26 @@ void COpenGLDriver::setRenderStates2DMode(bool alpha, bool texture, bool alphaCh
 				if (FeatureAvailable[IRR_ARB_texture_env_combine]||FeatureAvailable[IRR_EXT_texture_env_combine])
 				{
 #ifdef GL_ARB_texture_env_combine
-					glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_ARB);
-					glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_ALPHA_ARB, GL_REPLACE);
-					glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_ALPHA_ARB, GL_TEXTURE);
+					glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_ARB);
+					glTexEnvf(GL_TEXTURE_ENV, GL_COMBINE_ALPHA_ARB, GL_REPLACE);
+					glTexEnvf(GL_TEXTURE_ENV, GL_SOURCE0_ALPHA_ARB, GL_TEXTURE);
 					// rgb always modulates
-					glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB_ARB, GL_MODULATE);
-					glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_RGB_ARB, GL_TEXTURE);
-					glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE1_RGB_ARB, GL_PRIMARY_COLOR_ARB);
+					glTexEnvf(GL_TEXTURE_ENV, GL_COMBINE_RGB_ARB, GL_MODULATE);
+					glTexEnvf(GL_TEXTURE_ENV, GL_SOURCE0_RGB_ARB, GL_TEXTURE);
+					glTexEnvf(GL_TEXTURE_ENV, GL_SOURCE1_RGB_ARB, GL_PRIMARY_COLOR_ARB);
 #else
-					glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_EXT);
-					glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_ALPHA_EXT, GL_REPLACE);
-					glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_ALPHA_EXT, GL_TEXTURE);
+					glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_EXT);
+					glTexEnvf(GL_TEXTURE_ENV, GL_COMBINE_ALPHA_EXT, GL_REPLACE);
+					glTexEnvf(GL_TEXTURE_ENV, GL_SOURCE0_ALPHA_EXT, GL_TEXTURE);
 					// rgb always modulates
-					glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB_EXT, GL_MODULATE);
-					glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_RGB_EXT, GL_TEXTURE);
-					glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE1_RGB_EXT, GL_PRIMARY_COLOR_EXT);
+					glTexEnvf(GL_TEXTURE_ENV, GL_COMBINE_RGB_EXT, GL_MODULATE);
+					glTexEnvf(GL_TEXTURE_ENV, GL_SOURCE0_RGB_EXT, GL_TEXTURE);
+					glTexEnvf(GL_TEXTURE_ENV, GL_SOURCE1_RGB_EXT, GL_PRIMARY_COLOR_EXT);
 #endif
 				}
 				else
 #endif
-					glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+					glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 			}
 		}
 		else
@@ -2968,21 +3325,21 @@ void COpenGLDriver::setRenderStates2DMode(bool alpha, bool texture, bool alphaCh
 				if (FeatureAvailable[IRR_ARB_texture_env_combine]||FeatureAvailable[IRR_EXT_texture_env_combine])
 				{
 #ifdef GL_ARB_texture_env_combine
-					glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_ARB);
-					glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_ALPHA_ARB, GL_REPLACE);
-					glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_ALPHA_ARB, GL_PRIMARY_COLOR_ARB);
+					glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_ARB);
+					glTexEnvf(GL_TEXTURE_ENV, GL_COMBINE_ALPHA_ARB, GL_REPLACE);
+					glTexEnvf(GL_TEXTURE_ENV, GL_SOURCE0_ALPHA_ARB, GL_PRIMARY_COLOR_ARB);
 					// rgb always modulates
-					glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB_ARB, GL_MODULATE);
-					glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_RGB_ARB, GL_TEXTURE);
-					glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE1_RGB_ARB, GL_PRIMARY_COLOR_ARB);
+					glTexEnvf(GL_TEXTURE_ENV, GL_COMBINE_RGB_ARB, GL_MODULATE);
+					glTexEnvf(GL_TEXTURE_ENV, GL_SOURCE0_RGB_ARB, GL_TEXTURE);
+					glTexEnvf(GL_TEXTURE_ENV, GL_SOURCE1_RGB_ARB, GL_PRIMARY_COLOR_ARB);
 #else
-					glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_EXT);
-					glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_ALPHA_EXT, GL_REPLACE);
-					glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_ALPHA_EXT, GL_PRIMARY_COLOR_EXT);
+					glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_EXT);
+					glTexEnvf(GL_TEXTURE_ENV, GL_COMBINE_ALPHA_EXT, GL_REPLACE);
+					glTexEnvf(GL_TEXTURE_ENV, GL_SOURCE0_ALPHA_EXT, GL_PRIMARY_COLOR_EXT);
 					// rgb always modulates
-					glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB_EXT, GL_MODULATE);
-					glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_RGB_EXT, GL_TEXTURE);
-					glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE1_RGB_EXT, GL_PRIMARY_COLOR_EXT);
+					glTexEnvf(GL_TEXTURE_ENV, GL_COMBINE_RGB_EXT, GL_MODULATE);
+					glTexEnvf(GL_TEXTURE_ENV, GL_SOURCE0_RGB_EXT, GL_TEXTURE);
+					glTexEnvf(GL_TEXTURE_ENV, GL_SOURCE1_RGB_EXT, GL_PRIMARY_COLOR_EXT);
 #endif
 				}
 				else
@@ -3192,14 +3549,20 @@ void COpenGLDriver::setAmbientLight(const SColorf& color)
 // method just a bit.
 void COpenGLDriver::setViewPort(const core::rect<s32>& area)
 {
+	if (area == ViewPort)
+		return;
 	core::rect<s32> vp = area;
-	core::rect<s32> rendert(0, 0, getCurrentRenderTargetSize().Width, getCurrentRenderTargetSize().Height);
+	core::rect<s32> rendert(0,0, getCurrentRenderTargetSize().Width, getCurrentRenderTargetSize().Height);
 	vp.clipAgainst(rendert);
 
-	if (vp.getHeight() > 0 && vp.getWidth() > 0)
-		CacheHandler->setViewport(vp.UpperLeftCorner.X, getCurrentRenderTargetSize().Height - vp.UpperLeftCorner.Y - vp.getHeight(), vp.getWidth(), vp.getHeight());
+	if (vp.getHeight()>0 && vp.getWidth()>0)
+	{
+		glViewport(vp.UpperLeftCorner.X,
+				getCurrentRenderTargetSize().Height - vp.UpperLeftCorner.Y - vp.getHeight(),
+				vp.getWidth(), vp.getHeight());
 
-	ViewPort = vp;
+		ViewPort = vp;
+	}
 }
 
 
@@ -3226,10 +3589,8 @@ void COpenGLDriver::drawStencilShadowVolume(const core::array<core::vector3df>& 
 
 	glDisable(GL_LIGHTING);
 	glDisable(GL_FOG);
-	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LESS);
-	glDepthMask(GL_FALSE);
-
+	glDepthMask(GL_FALSE); // no depth buffer writing
 	if (debugDataVisible & scene::EDS_MESH_WIRE_OVERLAY)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	if (!(debugDataVisible & (scene::EDS_SKELETON|scene::EDS_MESH_WIRE_OVERLAY)))
@@ -3238,7 +3599,7 @@ void COpenGLDriver::drawStencilShadowVolume(const core::array<core::vector3df>& 
 		glEnable(GL_STENCIL_TEST);
 	}
 
-	CacheHandler->setClientState(true, false, false, false);
+	glEnableClientState(GL_VERTEX_ARRAY);
 	glVertexPointer(3,GL_FLOAT,sizeof(core::vector3df),triangles.const_pointer());
 	glStencilMask(~0);
 	glStencilFunc(GL_ALWAYS, 0, ~0);
@@ -3339,6 +3700,7 @@ void COpenGLDriver::drawStencilShadowVolume(const core::array<core::vector3df>& 
 #endif
 
 	glDisable(GL_POLYGON_OFFSET_FILL);
+	glDisableClientState(GL_VERTEX_ARRAY); //not stored on stack
 	glPopAttrib();
 }
 
@@ -3371,51 +3733,34 @@ void COpenGLDriver::drawStencilShadow(bool clearStencilBuffer, video::SColor lef
 	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
 
 	// draw a shadow rectangle covering the entire screen using stencil buffer
-	CacheHandler->setMatrixMode(GL_MODELVIEW);
+	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
 	glLoadIdentity();
-	CacheHandler->setMatrixMode(GL_PROJECTION);
+	glMatrixMode(GL_PROJECTION);
 	glPushMatrix();
 	glLoadIdentity();
 
-	Quad2DVertices[0].Color = leftDownEdge;
-	Quad2DVertices[1].Color = leftUpEdge;
-	Quad2DVertices[2].Color = rightUpEdge;
-	Quad2DVertices[3].Color = rightDownEdge;
+	glBegin(GL_QUADS);
 
-	Quad2DVertices[0].Pos = core::vector3df(-1.0f, -1.0f, -0.9f);
-	Quad2DVertices[1].Pos = core::vector3df(-1.0f, 1.0f, -0.9f);
-	Quad2DVertices[2].Pos = core::vector3df(1.0f, 1.0f, -0.9f);
-	Quad2DVertices[3].Pos = core::vector3df(1.0f, -1.0f, -0.9f);
+	glColor4ub(leftDownEdge.getRed(), leftDownEdge.getGreen(), leftDownEdge.getBlue(), leftDownEdge.getAlpha());
+	glVertex3f(-1.f,-1.f,-0.9f);
 
-	if (!FeatureAvailable[IRR_ARB_vertex_array_bgra] && !FeatureAvailable[IRR_EXT_vertex_array_bgra])
-		getColorBuffer(Quad2DVertices, 4, EVT_STANDARD);
+	glColor4ub(leftUpEdge.getRed(), leftUpEdge.getGreen(), leftUpEdge.getBlue(), leftUpEdge.getAlpha());
+	glVertex3f(-1.f, 1.f,-0.9f);
 
-	CacheHandler->setClientState(true, false, true, false);
+	glColor4ub(rightUpEdge.getRed(), rightUpEdge.getGreen(), rightUpEdge.getBlue(), rightUpEdge.getAlpha());
+	glVertex3f(1.f, 1.f,-0.9f);
 
-	glVertexPointer(3, GL_FLOAT, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(Quad2DVertices))[0].Pos);
+	glColor4ub(rightDownEdge.getRed(), rightDownEdge.getGreen(), rightDownEdge.getBlue(), rightDownEdge.getAlpha());
+	glVertex3f(1.f,-1.f,-0.9f);
 
-#ifdef GL_BGRA
-	const GLint colorSize=(FeatureAvailable[IRR_ARB_vertex_array_bgra] || FeatureAvailable[IRR_EXT_vertex_array_bgra])?GL_BGRA:4;
-#else
-	const GLint colorSize=4;
-#endif
-	if (FeatureAvailable[IRR_ARB_vertex_array_bgra] || FeatureAvailable[IRR_EXT_vertex_array_bgra])
-		glColorPointer(colorSize, GL_UNSIGNED_BYTE, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(Quad2DVertices))[0].Color);
-	else
-	{
-		_IRR_DEBUG_BREAK_IF(ColorBuffer.size()==0);
-		glColorPointer(colorSize, GL_UNSIGNED_BYTE, 0, &ColorBuffer[0]);
-	}
+	glEnd();
 
-	glDrawElements(GL_TRIANGLE_FAN, 4, GL_UNSIGNED_SHORT, Quad2DIndices);
-
-	if (clearStencilBuffer)
-		glClear(GL_STENCIL_BUFFER_BIT);
+	clearBuffers(false, false, clearStencilBuffer, 0x0);
 
 	// restore settings
 	glPopMatrix();
-	CacheHandler->setMatrixMode(GL_MODELVIEW);
+	glMatrixMode(GL_MODELVIEW);
 	glPopMatrix();
 	glPopAttrib();
 }
@@ -3461,67 +3806,6 @@ void COpenGLDriver::setFog(SColor c, E_FOG_TYPE fogType, f32 start,
 	glFogfv(GL_FOG_COLOR, data);
 }
 
-//! Draws a 3d box.
-void COpenGLDriver::draw3DBox( const core::aabbox3d<f32>& box, SColor color )
-{
-	core::vector3df edges[8];
-	box.getEdges(edges);
-
-	setRenderStates3DMode();
-
-	video::S3DVertex v[24];
-
-	for(u32 i = 0; i < 24; i++)
-		v[i].Color = color;
-
-	v[0].Pos = edges[5];
-	v[1].Pos = edges[1];
-	v[2].Pos = edges[1];
-	v[3].Pos = edges[3];
-	v[4].Pos = edges[3];
-	v[5].Pos = edges[7];
-	v[6].Pos = edges[7];
-	v[7].Pos = edges[5];
-	v[8].Pos = edges[0];
-	v[9].Pos = edges[2];
-	v[10].Pos = edges[2];
-	v[11].Pos = edges[6];
-	v[12].Pos = edges[6];
-	v[13].Pos = edges[4];
-	v[14].Pos = edges[4];
-	v[15].Pos = edges[0];
-	v[16].Pos = edges[1];
-	v[17].Pos = edges[0];
-	v[18].Pos = edges[3];
-	v[19].Pos = edges[2];
-	v[20].Pos = edges[7];
-	v[21].Pos = edges[6];
-	v[22].Pos = edges[5];
-	v[23].Pos = edges[4];
-
-	if (!FeatureAvailable[IRR_ARB_vertex_array_bgra] && !FeatureAvailable[IRR_EXT_vertex_array_bgra])
-		getColorBuffer(v, 24, EVT_STANDARD);
-
-	CacheHandler->setClientState(true, false, true, false);
-
-	glVertexPointer(3, GL_FLOAT, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(v))[0].Pos);
-
-#ifdef GL_BGRA
-	const GLint colorSize=(FeatureAvailable[IRR_ARB_vertex_array_bgra] || FeatureAvailable[IRR_EXT_vertex_array_bgra])?GL_BGRA:4;
-#else
-	const GLint colorSize=4;
-#endif
-	if (FeatureAvailable[IRR_ARB_vertex_array_bgra] || FeatureAvailable[IRR_EXT_vertex_array_bgra])
-		glColorPointer(colorSize, GL_UNSIGNED_BYTE, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(v))[0].Color);
-	else
-	{
-		_IRR_DEBUG_BREAK_IF(ColorBuffer.size()==0);
-		glColorPointer(colorSize, GL_UNSIGNED_BYTE, 0, &ColorBuffer[0]);
-	}
-
-	glDrawArrays(GL_LINES, 0, 24);
-}
-
 
 //! Draws a 3d line.
 void COpenGLDriver::draw3DLine(const core::vector3df& start,
@@ -3529,33 +3813,12 @@ void COpenGLDriver::draw3DLine(const core::vector3df& start,
 {
 	setRenderStates3DMode();
 
-	Quad2DVertices[0].Color = color;
-	Quad2DVertices[1].Color = color;
+	glBegin(GL_LINES);
+	glColor4ub(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha());
+	glVertex3f(start.X, start.Y, start.Z);
 
-	Quad2DVertices[0].Pos = core::vector3df((f32)start.X, (f32)start.Y, (f32)start.Z);
-	Quad2DVertices[1].Pos = core::vector3df((f32)end.X, (f32)end.Y, (f32)end.Z);
-
-	if (!FeatureAvailable[IRR_ARB_vertex_array_bgra] && !FeatureAvailable[IRR_EXT_vertex_array_bgra])
-		getColorBuffer(Quad2DVertices, 2, EVT_STANDARD);
-
-	CacheHandler->setClientState(true, false, true, false);
-
-	glVertexPointer(3, GL_FLOAT, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(Quad2DVertices))[0].Pos);
-
-#ifdef GL_BGRA
-	const GLint colorSize=(FeatureAvailable[IRR_ARB_vertex_array_bgra] || FeatureAvailable[IRR_EXT_vertex_array_bgra])?GL_BGRA:4;
-#else
-	const GLint colorSize=4;
-#endif
-	if (FeatureAvailable[IRR_ARB_vertex_array_bgra] || FeatureAvailable[IRR_EXT_vertex_array_bgra])
-		glColorPointer(colorSize, GL_UNSIGNED_BYTE, sizeof(S3DVertex), &(static_cast<const S3DVertex*>(Quad2DVertices))[0].Color);
-	else
-	{
-		_IRR_DEBUG_BREAK_IF(ColorBuffer.size()==0);
-		glColorPointer(colorSize, GL_UNSIGNED_BYTE, 0, &ColorBuffer[0]);
-	}
-
-	glDrawElements(GL_LINES, 2, GL_UNSIGNED_SHORT, Quad2DIndices);
+	glVertex3f(end.X, end.Y, end.Z);
+	glEnd();
 }
 
 
@@ -3566,24 +3829,17 @@ void COpenGLDriver::removeTexture(ITexture* texture)
 		return;
 
 	CNullDriver::removeTexture(texture);
+	// Remove this texture from CurrentTexture as well
+	CurrentTexture.remove(texture);
 }
 
-//! Check if the driver supports creating textures with the given color format
-bool COpenGLDriver::queryTextureFormat(ECOLOR_FORMAT format) const
-{
-	GLint dummyInternalFormat;
-	GLenum dummyPixelFormat;
-	GLenum dummyPixelType;
-	void (*dummyConverter)(const void*, s32, void*);
-	return getColorFormatParameters(format, dummyInternalFormat, dummyPixelFormat, dummyPixelType, &dummyConverter);
-}
 
 //! Only used by the internal engine. Used to notify the driver that
 //! the window was resized.
 void COpenGLDriver::OnResize(const core::dimension2d<u32>& size)
 {
 	CNullDriver::OnResize(size);
-	CacheHandler->setViewport(0, 0, size.Width, size.Height);
+	glViewport(0, 0, size.Width, size.Height);
 	Transformation3DChanged = true;
 }
 
@@ -3601,19 +3857,6 @@ ECOLOR_FORMAT COpenGLDriver::getColorFormat() const
 	return ColorFormat;
 }
 
-
-//! Get a vertex shader constant index.
-s32 COpenGLDriver::getVertexShaderConstantID(const c8* name)
-{
-	return getPixelShaderConstantID(name);
-}
-
-//! Get a pixel shader constant index.
-s32 COpenGLDriver::getPixelShaderConstantID(const c8* name)
-{
-	os::Printer::log("Error: Please call services->getPixelShaderConstantID(), not VideoDriver->getPixelShaderConstantID().");
-	return -1;
-}
 
 //! Sets a vertex shader constant.
 void COpenGLDriver::setVertexShaderConstant(const f32* data, s32 startRegister, s32 constantAmount)
@@ -3633,28 +3876,41 @@ void COpenGLDriver::setPixelShaderConstant(const f32* data, s32 startRegister, s
 #endif
 }
 
-//! Sets a constant for the vertex shader based on an index.
-bool COpenGLDriver::setVertexShaderConstant(s32 index, const f32* floats, int count)
+//! Sets a constant for the vertex shader based on a name.
+bool COpenGLDriver::setVertexShaderConstant(const c8* name, const f32* floats, int count)
 {
 	//pass this along, as in GLSL the same routine is used for both vertex and fragment shaders
-	return setPixelShaderConstant(index, floats, count);
+	return setPixelShaderConstant(name, floats, count);
+}
+
+//! Bool interface for the above.
+bool COpenGLDriver::setVertexShaderConstant(const c8* name, const bool* bools, int count)
+{
+	return setPixelShaderConstant(name, bools, count);
 }
 
 //! Int interface for the above.
-bool COpenGLDriver::setVertexShaderConstant(s32 index, const s32* ints, int count)
+bool COpenGLDriver::setVertexShaderConstant(const c8* name, const s32* ints, int count)
 {
-	return setPixelShaderConstant(index, ints, count);
+	return setPixelShaderConstant(name, ints, count);
 }
 
-//! Sets a constant for the pixel shader based on an index.
-bool COpenGLDriver::setPixelShaderConstant(s32 index, const f32* floats, int count)
+//! Sets a constant for the pixel shader based on a name.
+bool COpenGLDriver::setPixelShaderConstant(const c8* name, const f32* floats, int count)
+{
+	os::Printer::log("Error: Please call services->setPixelShaderConstant(), not VideoDriver->setPixelShaderConstant().");
+	return false;
+}
+
+//! Bool interface for the above.
+bool COpenGLDriver::setPixelShaderConstant(const c8* name, const bool* bools, int count)
 {
 	os::Printer::log("Error: Please call services->setPixelShaderConstant(), not VideoDriver->setPixelShaderConstant().");
 	return false;
 }
 
 //! Int interface for the above.
-bool COpenGLDriver::setPixelShaderConstant(s32 index, const s32* ints, int count)
+bool COpenGLDriver::setPixelShaderConstant(const c8* name, const s32* ints, int count)
 {
 	os::Printer::log("Error: Please call services->setPixelShaderConstant(), not VideoDriver->setPixelShaderConstant().");
 	return false;
@@ -3671,7 +3927,7 @@ s32 COpenGLDriver::addShaderMaterial(const c8* vertexShaderProgram,
 	s32 nr = -1;
 	COpenGLShaderMaterialRenderer* r = new COpenGLShaderMaterialRenderer(
 		this, nr, vertexShaderProgram, pixelShaderProgram,
-		callback, baseMaterial, userData);
+		callback, getMaterialRenderer(baseMaterial), userData);
 
 	r->drop();
 	return nr;
@@ -3698,15 +3954,32 @@ s32 COpenGLDriver::addHighLevelShaderMaterial(
 {
 	s32 nr = -1;
 
-	COpenGLSLMaterialRenderer* r = new COpenGLSLMaterialRenderer(
+	#ifdef _IRR_COMPILE_WITH_CG_
+	if (shadingLang == EGSL_CG)
+	{
+		COpenGLCgMaterialRenderer* r = new COpenGLCgMaterialRenderer(
 			this, nr,
 			vertexShaderProgram, vertexShaderEntryPointName, vsCompileTarget,
 			pixelShaderProgram, pixelShaderEntryPointName, psCompileTarget,
 			geometryShaderProgram, geometryShaderEntryPointName, gsCompileTarget,
 			inType, outType, verticesOut,
-			callback,baseMaterial, userData);
+			callback,getMaterialRenderer(baseMaterial), userData);
 
-	r->drop();
+		r->drop();
+	}
+	else
+	#endif
+	{
+		COpenGLSLMaterialRenderer* r = new COpenGLSLMaterialRenderer(
+			this, nr,
+			vertexShaderProgram, vertexShaderEntryPointName, vsCompileTarget,
+			pixelShaderProgram, pixelShaderEntryPointName, psCompileTarget,
+			geometryShaderProgram, geometryShaderEntryPointName, gsCompileTarget,
+			inType, outType, verticesOut,
+			callback,getMaterialRenderer(baseMaterial), userData);
+
+		r->drop();
+	}
 
 	return nr;
 }
@@ -3721,30 +3994,59 @@ IVideoDriver* COpenGLDriver::getVideoDriver()
 
 
 ITexture* COpenGLDriver::addRenderTargetTexture(const core::dimension2d<u32>& size,
-	const io::path& name, const ECOLOR_FORMAT format)
+					const io::path& name,
+					const ECOLOR_FORMAT format)
 {
 	//disable mip-mapping
 	bool generateMipLevels = getTextureCreationFlag(ETCF_CREATE_MIP_MAPS);
 	setTextureCreationFlag(ETCF_CREATE_MIP_MAPS, false);
 
-	bool supportForFBO = (Feature.ColorAttachment > 0);
-
-	core::dimension2du destSize(size);
-
-	if (!supportForFBO)
+	video::ITexture* rtt = 0;
+#if defined(GL_EXT_framebuffer_object)
+	// if driver supports FrameBufferObjects, use them
+	if (queryFeature(EVDF_FRAMEBUFFER_OBJECT))
 	{
-		destSize = core::dimension2d<u32>(core::min_(size.Width, ScreenSize.Width), core::min_(size.Height, ScreenSize.Height));
-		destSize = destSize.getOptimalSize((size == size.getOptimalSize()), false, false);
+		rtt = new COpenGLFBOTexture(size, name, this, format);
+		if (rtt)
+		{
+			bool success = false;
+			addTexture(rtt);
+			ITexture* tex = createDepthTexture(rtt);
+			if (tex)
+			{
+				success = static_cast<video::COpenGLFBODepthTexture*>(tex)->attach(rtt);
+				if ( !success )
+				{
+					removeDepthTexture(tex);
+				}
+				tex->drop();
+			}
+			rtt->drop();
+			if (!success)
+			{
+				removeTexture(rtt);
+				rtt=0;
+			}
+		}
 	}
-
-	COpenGLTexture* renderTargetTexture = new COpenGLTexture(name, destSize, format, this);
-	addTexture(renderTargetTexture);
-	renderTargetTexture->drop();
+	else
+#endif
+	{
+		// the simple texture is only possible for size <= screensize
+		// we try to find an optimal size with the original constraints
+		core::dimension2du destSize(core::min_(size.Width,ScreenSize.Width), core::min_(size.Height,ScreenSize.Height));
+		destSize = destSize.getOptimalSize((size==size.getOptimalSize()), false, false);
+		rtt = addTexture(destSize, name, ECF_A8R8G8B8);
+		if (rtt)
+		{
+			static_cast<video::COpenGLTexture*>(rtt)->setIsRenderTarget(true);
+		}
+	}
 
 	//restore mip-mapping
 	setTextureCreationFlag(ETCF_CREATE_MIP_MAPS, generateMipLevels);
 
-	return renderTargetTexture;
+	return rtt;
 }
 
 
@@ -3756,131 +4058,341 @@ u32 COpenGLDriver::getMaximalPrimitiveCount() const
 	return 0x7fffffff;
 }
 
-bool COpenGLDriver::setRenderTargetEx(IRenderTarget* target, u16 clearFlag, SColor clearColor, f32 clearDepth, u8 clearStencil)
+
+//! set or reset render target
+bool COpenGLDriver::setRenderTarget(video::E_RENDER_TARGET target, bool clearTarget,
+					bool clearZBuffer, SColor color)
 {
-	if (target && target->getDriverType() != EDT_OPENGL)
+	if (target != CurrentTarget)
+		setRenderTarget(0, false, false, 0x0);
+
+	if (ERT_RENDER_TEXTURE == target)
 	{
-		os::Printer::log("Fatal Error: Tried to set a render target not owned by this driver.", ELL_ERROR);
+		os::Printer::log("For render textures call setRenderTarget with the actual texture as first parameter.", ELL_ERROR);
+		return false;
+	}
+	if (ERT_MULTI_RENDER_TEXTURES == target)
+	{
+		os::Printer::log("For multiple render textures call setRenderTarget with the texture array as first parameter.", ELL_ERROR);
 		return false;
 	}
 
-	bool supportForFBO = (Feature.ColorAttachment > 0);
-
-	core::dimension2d<u32> destRenderTargetSize(0, 0);
-
-	if (target)
+	if (Params.Stereobuffer && (ERT_STEREO_RIGHT_BUFFER == target))
 	{
-		COpenGLRenderTarget* renderTarget = static_cast<COpenGLRenderTarget*>(target);
-
-		if (supportForFBO)
-		{
-			CacheHandler->setFBO(renderTarget->getBufferID());
-			renderTarget->update();
-		}
-
-		destRenderTargetSize = renderTarget->getSize();
-
-		CacheHandler->setViewport(0, 0, destRenderTargetSize.Width, destRenderTargetSize.Height);
+		if (Params.Doublebuffer)
+			glDrawBuffer(GL_BACK_RIGHT);
+		else
+			glDrawBuffer(GL_FRONT_RIGHT);
+	}
+	else if (Params.Stereobuffer && ERT_STEREO_BOTH_BUFFERS == target)
+	{
+		if (Params.Doublebuffer)
+			glDrawBuffer(GL_BACK);
+		else
+			glDrawBuffer(GL_FRONT);
+	}
+	else if ((target >= ERT_AUX_BUFFER0) && (target-ERT_AUX_BUFFER0 < MaxAuxBuffers))
+	{
+			glDrawBuffer(GL_AUX0+target-ERT_AUX_BUFFER0);
 	}
 	else
 	{
-		if (supportForFBO)
-			CacheHandler->setFBO(0);
+		if (Params.Doublebuffer)
+			glDrawBuffer(GL_BACK_LEFT);
 		else
+			glDrawBuffer(GL_FRONT_LEFT);
+		// exit with false, but also with working color buffer
+		if (target != ERT_FRAME_BUFFER)
+			return false;
+	}
+	CurrentTarget=target;
+	clearBuffers(clearTarget, clearZBuffer, false, color);
+	return true;
+}
+
+
+//! set or reset render target
+bool COpenGLDriver::setRenderTarget(video::ITexture* texture, bool clearBackBuffer,
+					bool clearZBuffer, SColor color)
+{
+	// check for right driver type
+
+	if (texture && texture->getDriverType() != EDT_OPENGL)
+	{
+		os::Printer::log("Fatal Error: Tried to set a texture not owned by this driver.", ELL_ERROR);
+		return false;
+	}
+
+#if defined(GL_EXT_framebuffer_object)
+	if (CurrentTarget==ERT_MULTI_RENDER_TEXTURES)
+	{
+		for (u32 i=0; i<MRTargets.size(); ++i)
 		{
-			COpenGLRenderTarget* prevRenderTarget = static_cast<COpenGLRenderTarget*>(CurrentRenderTarget);
-			COpenGLTexture* renderTargetTexture = static_cast<COpenGLTexture*>(prevRenderTarget->getTexture());
-
-			if (renderTargetTexture)
+			if (MRTargets[i].TargetType==ERT_RENDER_TEXTURE)
 			{
-				const COpenGLTexture* prevTexture = CacheHandler->getTextureCache()[0];
-
-				CacheHandler->getTextureCache().set(0, renderTargetTexture);
-
-				const core::dimension2d<u32> size = renderTargetTexture->getSize();
-				glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, size.Width, size.Height);
-
-				CacheHandler->getTextureCache().set(0, prevTexture);
+				for (++i; i<MRTargets.size(); ++i)
+					if (MRTargets[i].TargetType==ERT_RENDER_TEXTURE)
+						extGlFramebufferTexture2D(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT+i, GL_TEXTURE_2D, 0, 0);
 			}
 		}
-
-		destRenderTargetSize = core::dimension2d<u32>(0, 0);
-
-		CacheHandler->setViewport(0, 0, ScreenSize.Width, ScreenSize.Height);
+		MRTargets.clear();
 	}
+#endif
 
-	if (CurrentRenderTargetSize != destRenderTargetSize)
+	// check if we should set the previous RT back
+	if ((RenderTargetTexture != texture) ||
+		(CurrentTarget==ERT_MULTI_RENDER_TEXTURES))
 	{
-		CurrentRenderTargetSize = destRenderTargetSize;
+		setActiveTexture(0, 0);
+		ResetRenderStates=true;
+		if (RenderTargetTexture!=0)
+		{
+			RenderTargetTexture->unbindRTT();
+		}
 
-		Transformation3DChanged = true;
+		if (texture)
+		{
+			// we want to set a new target. so do this.
+			glViewport(0, 0, texture->getSize().Width, texture->getSize().Height);
+			RenderTargetTexture = static_cast<COpenGLTexture*>(texture);
+			// calls glDrawBuffer as well
+			RenderTargetTexture->bindRTT();
+			CurrentRendertargetSize = texture->getSize();
+			CurrentTarget=ERT_RENDER_TEXTURE;
+		}
+		else
+		{
+			glViewport(0,0,ScreenSize.Width,ScreenSize.Height);
+			RenderTargetTexture = 0;
+			CurrentRendertargetSize = core::dimension2d<u32>(0,0);
+			CurrentTarget=ERT_FRAME_BUFFER;
+			glDrawBuffer(Params.Doublebuffer?GL_BACK_LEFT:GL_FRONT_LEFT);
+		}
+		// we need to update the matrices due to the rendersize change.
+		Transformation3DChanged=true;
 	}
 
-	CurrentRenderTarget = target;
-
-	if (!supportForFBO)
-	{
-		clearFlag |= ECBF_COLOR;
-		clearFlag |= ECBF_DEPTH;
-	}
-
-	clearBuffers(clearFlag, clearColor, clearDepth, clearStencil);
+	clearBuffers(clearBackBuffer, clearZBuffer, false, color);
 
 	return true;
 }
 
 
-void COpenGLDriver::clearBuffers(u16 flag, SColor color, f32 depth, u8 stencil)
+//! Sets multiple render targets
+bool COpenGLDriver::setRenderTarget(const core::array<video::IRenderTarget>& targets,
+				bool clearBackBuffer, bool clearZBuffer, SColor color)
 {
-	GLbitfield mask = 0;
-	u8 colorMask = 0;
-	bool depthMask = false;
-
-	CacheHandler->getColorMask(colorMask);
-	CacheHandler->getDepthMask(depthMask);
-
-	if (flag & ECBF_COLOR)
+	// if simply disabling the MRT via array call
+	if (targets.size()==0)
+		return setRenderTarget(0, clearBackBuffer, clearZBuffer, color);
+	// if disabling old MRT, but enabling new one as well
+	if ((MRTargets.size()!=0) && (targets != MRTargets))
+		setRenderTarget(0, clearBackBuffer, clearZBuffer, color);
+	// if no change, simply clear buffers
+	else if (targets == MRTargets)
 	{
-		CacheHandler->setColorMask(ECP_ALL);
-
-		const f32 inv = 1.0f / 255.0f;
-		glClearColor(color.getRed() * inv, color.getGreen() * inv,
-			color.getBlue() * inv, color.getAlpha() * inv);
-
-		mask |= GL_COLOR_BUFFER_BIT;
+		clearBuffers(clearBackBuffer, clearZBuffer, false, color);
+		return true;
 	}
 
-	if (flag & ECBF_DEPTH)
+	// copy to storage for correct disabling
+	MRTargets=targets;
+
+	u32 maxMultipleRTTs = core::min_(static_cast<u32>(MaxMultipleRenderTargets), targets.size());
+
+	// determine common size
+	core::dimension2du rttSize = CurrentRendertargetSize;
+	if (targets[0].TargetType==ERT_RENDER_TEXTURE)
 	{
-		CacheHandler->setDepthMask(true);
-		glClearDepth(depth);
-		mask |= GL_DEPTH_BUFFER_BIT;
+		if (!targets[0].RenderTexture)
+		{
+			os::Printer::log("Missing render texture for MRT.", ELL_ERROR);
+			return false;
+		}
+		rttSize=targets[0].RenderTexture->getSize();
 	}
 
-	if (flag & ECBF_STENCIL)
+	for (u32 i = 0; i < maxMultipleRTTs; ++i)
 	{
-		glClearStencil(stencil);
-		mask |= GL_STENCIL_BUFFER_BIT;
+		// check for right driver type
+		if (targets[i].TargetType==ERT_RENDER_TEXTURE)
+		{
+			if (!targets[i].RenderTexture)
+			{
+				maxMultipleRTTs=i;
+				os::Printer::log("Missing render texture for MRT.", ELL_WARNING);
+				break;
+			}
+			if (targets[i].RenderTexture->getDriverType() != EDT_OPENGL)
+			{
+				maxMultipleRTTs=i;
+				os::Printer::log("Tried to set a texture not owned by this driver.", ELL_WARNING);
+				break;
+			}
+
+			// check for valid render target
+			if (!targets[i].RenderTexture->isRenderTarget() || !static_cast<COpenGLTexture*>(targets[i].RenderTexture)->isFrameBufferObject())
+			{
+				maxMultipleRTTs=i;
+				os::Printer::log("Tried to set a non FBO-RTT as render target.", ELL_WARNING);
+				break;
+			}
+
+			// check for valid size
+			if (rttSize != targets[i].RenderTexture->getSize())
+			{
+				maxMultipleRTTs=i;
+				os::Printer::log("Render target texture has wrong size.", ELL_WARNING);
+				break;
+			}
+		}
+	}
+	if (maxMultipleRTTs==0)
+	{
+		os::Printer::log("No valid MRTs.", ELL_ERROR);
+		return false;
 	}
 
-	if (mask)
-		glClear(mask);
+	// init FBO, if any
+	for (u32 i=0; i<maxMultipleRTTs; ++i)
+	{
+		if (targets[i].TargetType==ERT_RENDER_TEXTURE)
+		{
+			setRenderTarget(targets[i].RenderTexture, false, false, 0x0);
+			break; // bind only first RTT
+		}
+	}
+	// init other main buffer, if necessary
+	if (targets[0].TargetType!=ERT_RENDER_TEXTURE)
+		setRenderTarget(targets[0].TargetType, false, false, 0x0);
 
-	CacheHandler->setColorMask(colorMask);
-	CacheHandler->setDepthMask(depthMask);
+	// attach other textures and store buffers into array
+	if (maxMultipleRTTs > 1)
+	{
+		CurrentTarget=ERT_MULTI_RENDER_TEXTURES;
+		core::array<GLenum> MRTs;
+		MRTs.set_used(maxMultipleRTTs);
+		for(u32 i = 0; i < maxMultipleRTTs; i++)
+		{
+			if (FeatureAvailable[IRR_EXT_draw_buffers2])
+			{
+				extGlColorMaskIndexed(i,
+					(targets[i].ColorMask & ECP_RED)?GL_TRUE:GL_FALSE,
+					(targets[i].ColorMask & ECP_GREEN)?GL_TRUE:GL_FALSE,
+					(targets[i].ColorMask & ECP_BLUE)?GL_TRUE:GL_FALSE,
+					(targets[i].ColorMask & ECP_ALPHA)?GL_TRUE:GL_FALSE);
+				if (targets[i].BlendOp==EBO_NONE)
+					extGlDisableIndexed(GL_BLEND, i);
+				else
+					extGlEnableIndexed(GL_BLEND, i);
+			}
+#if defined(GL_AMD_draw_buffers_blend) || defined(GL_ARB_draw_buffers_blend)
+			if (FeatureAvailable[IRR_AMD_draw_buffers_blend] || FeatureAvailable[IRR_ARB_draw_buffers_blend])
+			{
+				extGlBlendFuncIndexed(i, getGLBlend(targets[i].BlendFuncSrc), getGLBlend(targets[i].BlendFuncDst));
+				switch(targets[i].BlendOp)
+				{
+				case EBO_SUBTRACT:
+					extGlBlendEquationIndexed(i, GL_FUNC_SUBTRACT);
+					break;
+				case EBO_REVSUBTRACT:
+					extGlBlendEquationIndexed(i, GL_FUNC_REVERSE_SUBTRACT);
+					break;
+				case EBO_MIN:
+					extGlBlendEquationIndexed(i, GL_MIN);
+					break;
+				case EBO_MAX:
+					extGlBlendEquationIndexed(i, GL_MAX);
+					break;
+				case EBO_MIN_FACTOR:
+				case EBO_MIN_ALPHA:
+#if defined(GL_AMD_blend_minmax_factor)
+					if (FeatureAvailable[IRR_AMD_blend_minmax_factor])
+						extGlBlendEquationIndexed(i, GL_FACTOR_MIN_AMD);
+					// fallback in case of missing extension
+					else
+#endif
+						extGlBlendEquation(GL_MIN);
+					break;
+				case EBO_MAX_FACTOR:
+				case EBO_MAX_ALPHA:
+#if defined(GL_AMD_blend_minmax_factor)
+					if (FeatureAvailable[IRR_AMD_blend_minmax_factor])
+						extGlBlendEquationIndexed(i, GL_FACTOR_MAX_AMD);
+					// fallback in case of missing extension
+					else
+#endif
+						extGlBlendEquation(GL_MAX);
+				break;
+				default:
+					extGlBlendEquationIndexed(i, GL_FUNC_ADD);
+					break;
+				}
+			}
+#endif
+			if (targets[i].TargetType==ERT_RENDER_TEXTURE)
+			{
+				GLenum attachment = GL_NONE;
+#ifdef GL_EXT_framebuffer_object
+				// attach texture to FrameBuffer Object on Color [i]
+				attachment = GL_COLOR_ATTACHMENT0_EXT+i;
+				if ((i != 0) && (targets[i].RenderTexture != RenderTargetTexture))
+					extGlFramebufferTexture2D(GL_FRAMEBUFFER_EXT, attachment, GL_TEXTURE_2D, static_cast<COpenGLTexture*>(targets[i].RenderTexture)->getOpenGLTextureName(), 0);
+#endif
+				MRTs[i]=attachment;
+			}
+			else
+			{
+				switch(targets[i].TargetType)
+				{
+					case ERT_FRAME_BUFFER:
+						MRTs[i]=GL_BACK_LEFT;
+						break;
+					case ERT_STEREO_BOTH_BUFFERS:
+						MRTs[i]=GL_BACK;
+						break;
+					case ERT_STEREO_RIGHT_BUFFER:
+						MRTs[i]=GL_BACK_RIGHT;
+						break;
+					case ERT_STEREO_LEFT_BUFFER:
+						MRTs[i]=GL_BACK_LEFT;
+						break;
+					default:
+						MRTs[i]=GL_AUX0+(targets[i].TargetType-ERT_AUX_BUFFER0);
+						break;
+				}
+			}
+		}
+
+		extGlDrawBuffers(maxMultipleRTTs, MRTs.const_pointer());
+	}
+
+	clearBuffers(clearBackBuffer, clearZBuffer, false, color);
+	return true;
+}
+
+
+// returns the current size of the screen or rendertarget
+const core::dimension2d<u32>& COpenGLDriver::getCurrentRenderTargetSize() const
+{
+	if (CurrentRendertargetSize.Width == 0)
+		return ScreenSize;
+	else
+		return CurrentRendertargetSize;
+}
+
+
+//! Clears the ZBuffer.
+void COpenGLDriver::clearZBuffer()
+{
+	clearBuffers(false, true, false, 0x0);
 }
 
 
 //! Returns an image created from the last rendered frame.
 IImage* COpenGLDriver::createScreenShot(video::ECOLOR_FORMAT format, video::E_RENDER_TARGET target)
 {
-	if (target != video::ERT_FRAME_BUFFER)
-		return 0;
-
-	if (format==video::ECF_UNKNOWN)
-		format=getColorFormat();
-
-	if (IImage::isRenderTargetOnlyFormat(format) || IImage::isCompressedFormat(format) || IImage::isDepthFormat(format))
+	if (target==video::ERT_MULTI_RENDER_TEXTURES || target==video::ERT_RENDER_TEXTURE || target==video::ERT_STEREO_BOTH_BUFFERS)
 		return 0;
 
 	// allows to read pixels in top-to-bottom order
@@ -3889,9 +4401,10 @@ IImage* COpenGLDriver::createScreenShot(video::ECOLOR_FORMAT format, video::E_RE
 		glPixelStorei(GL_PACK_INVERT_MESA, GL_TRUE);
 #endif
 
+	if (format==video::ECF_UNKNOWN)
+		format=getColorFormat();
 	GLenum fmt;
 	GLenum type;
-
 	switch (format)
 	{
 	case ECF_A1R5G5B5:
@@ -3913,6 +4426,70 @@ IImage* COpenGLDriver::createScreenShot(video::ECOLOR_FORMAT format, video::E_RE
 		else
 			type = GL_UNSIGNED_BYTE;
 		break;
+	case ECF_R16F:
+		if (FeatureAvailable[IRR_ARB_texture_rg])
+			fmt = GL_RED;
+		else
+			fmt = GL_LUMINANCE;
+#ifdef GL_ARB_half_float_pixel
+		if (FeatureAvailable[IRR_ARB_half_float_pixel])
+			type = GL_HALF_FLOAT_ARB;
+		else
+#endif
+		{
+			type = GL_FLOAT;
+			format = ECF_R32F;
+		}
+		break;
+	case ECF_G16R16F:
+#ifdef GL_ARB_texture_rg
+		if (FeatureAvailable[IRR_ARB_texture_rg])
+			fmt = GL_RG;
+		else
+#endif
+			fmt = GL_LUMINANCE_ALPHA;
+#ifdef GL_ARB_half_float_pixel
+		if (FeatureAvailable[IRR_ARB_half_float_pixel])
+			type = GL_HALF_FLOAT_ARB;
+		else
+#endif
+		{
+			type = GL_FLOAT;
+			format = ECF_G32R32F;
+		}
+		break;
+	case ECF_A16B16G16R16F:
+		fmt = GL_BGRA;
+#ifdef GL_ARB_half_float_pixel
+		if (FeatureAvailable[IRR_ARB_half_float_pixel])
+			type = GL_HALF_FLOAT_ARB;
+		else
+#endif
+		{
+			type = GL_FLOAT;
+			format = ECF_A32B32G32R32F;
+		}
+		break;
+	case ECF_R32F:
+		if (FeatureAvailable[IRR_ARB_texture_rg])
+			fmt = GL_RED;
+		else
+			fmt = GL_LUMINANCE;
+		type = GL_FLOAT;
+		break;
+	case ECF_G32R32F:
+#ifdef GL_ARB_texture_rg
+		if (FeatureAvailable[IRR_ARB_texture_rg])
+			fmt = GL_RG;
+		else
+#endif
+			fmt = GL_LUMINANCE_ALPHA;
+		type = GL_FLOAT;
+		break;
+	case ECF_A32B32G32R32F:
+		fmt = GL_BGRA;
+		type = GL_FLOAT;
+		break;
 	default:
 		fmt = GL_BGRA;
 		type = GL_UNSIGNED_BYTE;
@@ -3922,7 +4499,7 @@ IImage* COpenGLDriver::createScreenShot(video::ECOLOR_FORMAT format, video::E_RE
 
 	u8* pixels = 0;
 	if (newImage)
-		pixels = static_cast<u8*>(newImage->getData());
+		pixels = static_cast<u8*>(newImage->lock());
 	if (pixels)
 	{
 		GLenum tgt=GL_FRONT;
@@ -3942,7 +4519,7 @@ IImage* COpenGLDriver::createScreenShot(video::ECOLOR_FORMAT format, video::E_RE
 		}
 		glReadBuffer(tgt);
 		glReadPixels(0, 0, ScreenSize.Width, ScreenSize.Height, fmt, type, pixels);
-		testGLError(__LINE__);
+		testGLError();
 		glReadBuffer(GL_BACK);
 	}
 
@@ -3978,7 +4555,8 @@ IImage* COpenGLDriver::createScreenShot(video::ECOLOR_FORMAT format, video::E_RE
 
 	if (newImage)
 	{
-		if (testGLError(__LINE__) || !pixels)
+		newImage->unlock();
+		if (testGLError() || !pixels)
 		{
 			newImage->drop();
 			return 0;
@@ -3986,6 +4564,47 @@ IImage* COpenGLDriver::createScreenShot(video::ECOLOR_FORMAT format, video::E_RE
 	}
 	return newImage;
 }
+
+
+//! get depth texture for the given render target texture
+ITexture* COpenGLDriver::createDepthTexture(ITexture* texture, bool shared)
+{
+	if ((texture->getDriverType() != EDT_OPENGL) || (!texture->isRenderTarget()))
+		return 0;
+	COpenGLTexture* tex = static_cast<COpenGLTexture*>(texture);
+
+	if (!tex->isFrameBufferObject())
+		return 0;
+
+	if (shared)
+	{
+		for (u32 i=0; i<DepthTextures.size(); ++i)
+		{
+			if (DepthTextures[i]->getSize()==texture->getSize())
+			{
+				DepthTextures[i]->grab();
+				return DepthTextures[i];
+			}
+		}
+		DepthTextures.push_back(new COpenGLFBODepthTexture(texture->getSize(), "depth1", this));
+		return DepthTextures.getLast();
+	}
+	return (new COpenGLFBODepthTexture(texture->getSize(), "depth1", this));
+}
+
+
+void COpenGLDriver::removeDepthTexture(ITexture* texture)
+{
+	for (u32 i=0; i<DepthTextures.size(); ++i)
+	{
+		if (texture==DepthTextures[i])
+		{
+			DepthTextures.erase(i);
+			return;
+		}
+	}
+}
+
 
 //! Set/unset a clipping plane.
 bool COpenGLDriver::setClipPlane(u32 index, const core::plane3df& plane, bool enable)
@@ -4114,235 +4733,12 @@ GLenum COpenGLDriver::getZBufferBits() const
 	return bits;
 }
 
-bool COpenGLDriver::getColorFormatParameters(ECOLOR_FORMAT format, GLint& internalFormat, GLenum& pixelFormat,
-	GLenum& pixelType, void(**converter)(const void*, s32, void*)) const
+#ifdef _IRR_COMPILE_WITH_CG_
+const CGcontext& COpenGLDriver::getCgContext()
 {
-	bool supported = false;
-	internalFormat = GL_RGBA;
-	pixelFormat = GL_RGBA;
-	pixelType = GL_UNSIGNED_BYTE;
-
-	switch (format)
-	{
-	case ECF_A1R5G5B5:
-		supported = true;
-		internalFormat = GL_RGBA;
-		pixelFormat = GL_BGRA_EXT;
-		pixelType = GL_UNSIGNED_SHORT_1_5_5_5_REV;
-		break;
-	case ECF_R5G6B5:
-		supported = true;
-		internalFormat = GL_RGB;
-		pixelFormat = GL_RGB;
-		pixelType = GL_UNSIGNED_SHORT_5_6_5;
-		break;
-	case ECF_R8G8B8:
-		supported = true;
-		internalFormat = GL_RGB;
-		pixelFormat = GL_BGR;
-		pixelType = GL_UNSIGNED_BYTE;
-		break;
-	case ECF_A8R8G8B8:
-		supported = true;
-		internalFormat = GL_RGBA;
-		pixelFormat = GL_BGRA_EXT;
-		if (Version > 101)
-			pixelType = GL_UNSIGNED_INT_8_8_8_8_REV;
-		break;
-	case ECF_DXT1:
-		supported = true;
-		internalFormat = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
-		pixelFormat = GL_BGRA_EXT;
-		pixelType = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
-		break;
-	case ECF_DXT2:
-	case ECF_DXT3:
-		supported = true;
-		internalFormat = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
-		pixelFormat = GL_BGRA_EXT;
-		pixelType = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
-		break;
-	case ECF_DXT4:
-	case ECF_DXT5:
-		supported = true;
-		internalFormat = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
-		pixelFormat = GL_BGRA_EXT;
-		pixelType = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
-		break;
-	case ECF_D16:
-		supported = true;
-		internalFormat = GL_DEPTH_COMPONENT16;
-		pixelFormat = GL_DEPTH_COMPONENT;
-		pixelType = GL_UNSIGNED_SHORT;
-		break;
-	case ECF_D32:
-		supported = true;
-		internalFormat = GL_DEPTH_COMPONENT32;
-		pixelFormat = GL_DEPTH_COMPONENT;
-		pixelType = GL_UNSIGNED_INT;
-		break;
-	case ECF_D24S8:
-#ifdef GL_VERSION_3_0
-		if (Version >= 300)
-		{
-			supported = true;
-			internalFormat = GL_DEPTH_STENCIL;
-			pixelFormat = GL_DEPTH_STENCIL;
-			pixelType = GL_UNSIGNED_INT_24_8;
-		}
-		else
-#endif
-#ifdef GL_EXT_packed_depth_stencil
-		if (queryOpenGLFeature(COpenGLExtensionHandler::IRR_EXT_packed_depth_stencil))
-		{
-			supported = true;
-			internalFormat = GL_DEPTH_STENCIL_EXT;
-			pixelFormat = GL_DEPTH_STENCIL_EXT;
-			pixelType = GL_UNSIGNED_INT_24_8_EXT;
-		}
-#endif
-		break;
-	case ECF_R8:
-		if (queryOpenGLFeature(COpenGLExtensionHandler::IRR_ARB_texture_rg))
-		{
-			supported = true;
-			internalFormat = GL_R8;
-			pixelFormat = GL_RED;
-			pixelType = GL_UNSIGNED_BYTE;
-		}
-		break;
-	case ECF_R8G8:
-		if (queryOpenGLFeature(COpenGLExtensionHandler::IRR_ARB_texture_rg))
-		{
-			supported = true;
-			internalFormat = GL_RG8;
-			pixelFormat = GL_RG;
-			pixelType = GL_UNSIGNED_BYTE;
-		}
-		break;
-	case ECF_R16:
-		if (queryOpenGLFeature(COpenGLExtensionHandler::IRR_ARB_texture_rg))
-		{
-			supported = true;
-			internalFormat = GL_R16;
-			pixelFormat = GL_RED;
-			pixelType = GL_UNSIGNED_SHORT;
-		}
-		break;
-	case ECF_R16G16:
-		if (queryOpenGLFeature(COpenGLExtensionHandler::IRR_ARB_texture_rg))
-		{
-			supported = true;
-			internalFormat = GL_RG16;
-			pixelFormat = GL_RG;
-			pixelType = GL_UNSIGNED_SHORT;
-		}
-		break;
-	case ECF_R16F:
-		if (queryOpenGLFeature(COpenGLExtensionHandler::IRR_ARB_texture_rg))
-		{
-			supported = true;
-			internalFormat = GL_R16F;
-			pixelFormat = GL_RED;
-#ifdef GL_ARB_half_float_pixel
-			if (queryOpenGLFeature(COpenGLExtensionHandler::IRR_ARB_half_float_pixel))
-				pixelType = GL_HALF_FLOAT_ARB;
-			else
-#endif
-				pixelType = GL_FLOAT;
-		}
-		break;
-	case ECF_G16R16F:
-		if (queryOpenGLFeature(COpenGLExtensionHandler::IRR_ARB_texture_rg))
-		{
-			supported = true;
-			internalFormat = GL_RG16F;
-			pixelFormat = GL_RG;
-#ifdef GL_ARB_half_float_pixel
-			if (queryOpenGLFeature(COpenGLExtensionHandler::IRR_ARB_half_float_pixel))
-				pixelType = GL_HALF_FLOAT_ARB;
-			else
-#endif
-				pixelType = GL_FLOAT;
-		}
-		break;
-	case ECF_A16B16G16R16F:
-		if (queryOpenGLFeature(COpenGLExtensionHandler::IRR_ARB_texture_float))
-		{
-			supported = true;
-			internalFormat = GL_RGBA16F_ARB;
-			pixelFormat = GL_RGBA;
-#ifdef GL_ARB_half_float_pixel
-			if (queryOpenGLFeature(COpenGLExtensionHandler::IRR_ARB_half_float_pixel))
-				pixelType = GL_HALF_FLOAT_ARB;
-			else
-#endif
-				pixelType = GL_FLOAT;
-		}
-		break;
-	case ECF_R32F:
-		if (queryOpenGLFeature(COpenGLExtensionHandler::IRR_ARB_texture_rg))
-		{
-			supported = true;
-			internalFormat = GL_R32F;
-			pixelFormat = GL_RED;
-			pixelType = GL_FLOAT;
-		}
-		break;
-	case ECF_G32R32F:
-		if (queryOpenGLFeature(COpenGLExtensionHandler::IRR_ARB_texture_rg))
-		{
-			supported = true;
-			internalFormat = GL_RG32F;
-			pixelFormat = GL_RG;
-			pixelType = GL_FLOAT;
-		}
-		break;
-	case ECF_A32B32G32R32F:
-		if (queryOpenGLFeature(COpenGLExtensionHandler::IRR_ARB_texture_float))
-		{
-			supported = true;
-			internalFormat = GL_RGBA32F_ARB;
-			pixelFormat = GL_RGBA;
-			pixelType = GL_FLOAT;
-		}
-		break;
-	default:
-		break;
-	}
-
-#if defined(GL_ARB_framebuffer_sRGB) || defined(GL_EXT_framebuffer_sRGB)
-	if (Params.HandleSRGB)
-	{
-		if (internalFormat == GL_RGBA)
-			internalFormat = GL_SRGB_ALPHA_EXT;
-		else if (internalFormat == GL_RGB)
-			internalFormat = GL_SRGB_EXT;
-	}
-#endif
-
-	return supported;
+	return CgContext;
 }
-
-COpenGLDriver::E_OPENGL_FIXED_PIPELINE_STATE COpenGLDriver::getFixedPipelineState() const
-{
-	return FixedPipelineState;
-}
-
-void COpenGLDriver::setFixedPipelineState(COpenGLDriver::E_OPENGL_FIXED_PIPELINE_STATE state)
-{
-	FixedPipelineState = state;
-}
-
-const SMaterial& COpenGLDriver::getCurrentMaterial() const
-{
-	return Material;
-}
-
-COpenGLCacheHandler* COpenGLDriver::getCacheHandler() const
-{
-	return CacheHandler;
-}
+#endif
 
 
 } // end namespace
@@ -4355,24 +4751,64 @@ namespace irr
 namespace video
 {
 
-#if defined(_IRR_COMPILE_WITH_WINDOWS_DEVICE_) || defined(_IRR_COMPILE_WITH_X11_DEVICE_) || defined(_IRR_COMPILE_WITH_OSX_DEVICE_)
-	IVideoDriver* createOpenGLDriver(const SIrrlichtCreationParameters& params, io::IFileSystem* io, IContextManager* contextManager)
-	{
+
+// -----------------------------------
+// WINDOWS VERSION
+// -----------------------------------
+#ifdef _IRR_COMPILE_WITH_WINDOWS_DEVICE_
+IVideoDriver* createOpenGLDriver(const SIrrlichtCreationParameters& params,
+	io::IFileSystem* io, CIrrDeviceWin32* device)
+{
 #ifdef _IRR_COMPILE_WITH_OPENGL_
-		COpenGLDriver* ogl = new COpenGLDriver(params, io, contextManager);
-
-		if (!ogl->initDriver())
-		{
-			ogl->drop();
-			ogl = 0;
-		}
-
-		return ogl;
-#else
-		return 0;
-#endif
+	COpenGLDriver* ogl =  new COpenGLDriver(params, io, device);
+	if (!ogl->initDriver(device))
+	{
+		ogl->drop();
+		ogl = 0;
 	}
-#endif
+	return ogl;
+#else
+	return 0;
+#endif // _IRR_COMPILE_WITH_OPENGL_
+}
+#endif // _IRR_COMPILE_WITH_WINDOWS_DEVICE_
+
+// -----------------------------------
+// MACOSX VERSION
+// -----------------------------------
+#if defined(_IRR_COMPILE_WITH_OSX_DEVICE_)
+IVideoDriver* createOpenGLDriver(const SIrrlichtCreationParameters& params,
+		io::IFileSystem* io, CIrrDeviceMacOSX *device)
+{
+#ifdef _IRR_COMPILE_WITH_OPENGL_
+	return new COpenGLDriver(params, io, device);
+#else
+	return 0;
+#endif //  _IRR_COMPILE_WITH_OPENGL_
+}
+#endif // _IRR_COMPILE_WITH_OSX_DEVICE_
+
+// -----------------------------------
+// X11 VERSION
+// -----------------------------------
+#ifdef _IRR_COMPILE_WITH_X11_DEVICE_
+IVideoDriver* createOpenGLDriver(const SIrrlichtCreationParameters& params,
+		io::IFileSystem* io, CIrrDeviceLinux* device)
+{
+#ifdef _IRR_COMPILE_WITH_OPENGL_
+	COpenGLDriver* ogl =  new COpenGLDriver(params, io, device);
+	if (!ogl->initDriver(device))
+	{
+		ogl->drop();
+		ogl = 0;
+	}
+	return ogl;
+#else
+	return 0;
+#endif //  _IRR_COMPILE_WITH_OPENGL_
+}
+#endif // _IRR_COMPILE_WITH_X11_DEVICE_
+
 
 // -----------------------------------
 // SDL VERSION

@@ -1,20 +1,19 @@
 /** Example 002 Quake3Map
 
-This tutorial shows how to load a Quake 3 map into the engine, create a
+This Tutorial shows how to load a Quake 3 map into the engine, create a
 SceneNode for optimizing the speed of rendering, and how to create a user
 controlled camera.
 
 Please note that you should know the basics of the engine before starting this
 tutorial. Just take a short look at the first tutorial, if you haven't done
-this yet: http://irrlicht.sourceforge.net/docu/example001.html
+this yet: http://irrlicht.sourceforge.net/tut001.html
 
 Lets start like the HelloWorld example: We include the irrlicht header files
 and an additional file to be able to ask the user for a driver type using the
 console.
 */
 #include <irrlicht.h>
-#include "driverChoice.h"
-#include "exampleHelper.h"
+#include <iostream>
 
 /*
 As already written in the HelloWorld example, in the Irrlicht Engine everything
@@ -38,7 +37,7 @@ easy, we use a pragma comment lib:
 #endif
 
 /*
-OK, lets start. Again, we use the main() method as start, not the WinMain().
+Ok, lets start. Again, we use the main() method as start, not the WinMain().
 */
 int main()
 {
@@ -48,12 +47,33 @@ int main()
 	which video driver to use. The Software device might be
 	too slow to draw a huge Quake 3 map, but just for the fun of it, we make
 	this decision possible, too.
+	Instead of copying this whole code into your app, you can simply include
+	driverChoice.h from Irrlicht's include directory. The function
+	driverChoiceConsole does exactly the same.
 	*/
 
 	// ask user for driver
-	video::E_DRIVER_TYPE driverType=driverChoiceConsole(true);
-	if (driverType==video::EDT_COUNT)
-		return 1;
+
+	video::E_DRIVER_TYPE driverType;
+
+	printf("Please select the driver you want for this example:\n"\
+		" (a) OpenGL 1.5\n (b) Direct3D 9.0c\n (c) Direct3D 8.1\n"\
+		" (d) Burning's Software Renderer\n (e) Software Renderer\n"\
+		" (f) NullDevice\n (otherKey) exit\n\n");
+
+	char i;
+	std::cin >> i;
+
+	switch(i)
+	{
+		case 'a': driverType = video::EDT_OPENGL;   break;
+		case 'b': driverType = video::EDT_DIRECT3D9;break;
+		case 'c': driverType = video::EDT_DIRECT3D8;break;
+		case 'd': driverType = video::EDT_BURNINGSVIDEO;break;
+		case 'e': driverType = video::EDT_SOFTWARE; break;
+		case 'f': driverType = video::EDT_NULL;     break;
+		default: return 1;
+	}
 
 	// create device and exit if creation failed
 
@@ -75,14 +95,16 @@ int main()
 	To display the Quake 3 map, we first need to load it. Quake 3 maps
 	are packed into .pk3 files which are nothing else than .zip files.
 	So we add the .pk3 file to our irr::io::IFileSystem. After it was added,
-	we can read from the files in that archive as if they were stored on disk.
+	we are able to read from the files in that archive as if they are
+	directly stored on the disk.
 	*/
-	device->getFileSystem()->addFileArchive(getExampleMediaPath() + "map-20kdm2.pk3");
+	device->getFileSystem()->addFileArchive("../../media/map-20kdm2.pk3");
 
 	/*
-	Now we can load the mesh by calling	irr::scene::ISceneManager::getMesh(). 
-	We get a pointer returned to an	irr::scene::IAnimatedMesh. Quake 3 maps are 
-	not	really animated, they are only a chunk of static geometry with
+	Now we can load the mesh by calling
+	irr::scene::ISceneManager::getMesh(). We get a pointer returned to an
+	irr::scene::IAnimatedMesh. As you might know, Quake 3 maps are not
+	really animated, they are only a huge chunk of static geometry with
 	some materials attached. Hence the IAnimatedMesh consists of only one
 	frame, so we get the "first frame" of the "animation", which is our
 	quake level and create an Octree scene node with it, using
@@ -96,8 +118,7 @@ int main()
 	driver. (There is a irr::video::IVideoDriver::getPrimitiveCountDrawn()
 	method in the irr::video::IVideoDriver class). Note that this
 	optimization with the Octree is only useful when drawing huge meshes
-	consisting of lots of geometry and if users can't see the whole scene at 
-	once.
+	consisting of lots of geometry.
 	*/
 	scene::IAnimatedMesh* mesh = smgr->getMesh("20kdm2.bsp");
 	scene::ISceneNode* node = 0;
@@ -107,7 +128,7 @@ int main()
 //		node = smgr->addMeshSceneNode(mesh->getMesh(0));
 
 	/*
-	Because the level was not modeled around the origin (0,0,0), we
+	Because the level was not modelled around the origin (0,0,0), we
 	translate the whole level a little bit. This is done on
 	irr::scene::ISceneNode level using the methods
 	irr::scene::ISceneNode::setPosition() (in this case),
@@ -118,7 +139,7 @@ int main()
 		node->setPosition(core::vector3df(-1300,-144,-1249));
 
 	/*
-	Now we need a camera to look at the Quake 3 map.
+	Now we only need a camera to look at the Quake 3 map.
 	We want to create a user controlled camera. There are some
 	cameras available in the Irrlicht engine. For example the
 	MayaCamera which can be controlled like the camera in Maya:
@@ -138,13 +159,13 @@ int main()
 	device->getCursorControl()->setVisible(false);
 
 	/*
-	Everything is set up, so lets draw it. We also write the current
+	We have done everything, so lets draw it. We also write the current
 	frames per second and the primitives drawn into the caption of the
 	window. The test for irr::IrrlichtDevice::isWindowActive() is optional,
 	but prevents the engine to grab the mouse cursor after task switching
-	when other programs are active. The call to	irr::IrrlichtDevice::yield()
-	will avoid the busy loop to eat up all CPU cycles when the window is not 
-	active.
+	when other programs are active. The call to
+	irr::IrrlichtDevice::yield() will avoid the busy loop to eat up all CPU
+	cycles when the window is not active.
 	*/
 	int lastFPS = -1;
 
@@ -152,7 +173,7 @@ int main()
 	{
 		if (device->isWindowActive())
 		{
-			driver->beginScene(video::ECBF_COLOR | video::ECBF_DEPTH, video::SColor(255,200,200,200));
+			driver->beginScene(true, true, video::SColor(255,200,200,200));
 			smgr->drawAll();
 			driver->endScene();
 

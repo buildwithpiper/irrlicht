@@ -2,7 +2,7 @@
 	Tool for creating Irrlicht bitmap+vector fonts,
 	started by Gaz Davidson in December 2006
 
-	Due to my laziness and Microsoft's unintuitive API, surrogate pairs and
+	Due to my laziness and Microsoft's unituitive API, surragate pairs and
 	nonspacing diacritical marks are not supported!
 
 	Linux bitmap font support added by Neil Burlock Oct 2008
@@ -476,7 +476,7 @@ int main()
 		if (device->isWindowActive())
 		{
 
-			driver->beginScene(video::ECBF_COLOR | video::ECBF_DEPTH, video::SColor(0,200,200,200));
+			driver->beginScene(true, true, video::SColor(0,200,200,200));
 			smgr->drawAll();
 			env->drawAll();
 			driver->endScene();

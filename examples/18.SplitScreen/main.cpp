@@ -12,7 +12,6 @@ nothing to say about it)
 
 #include <irrlicht.h>
 #include "driverChoice.h"
-#include "exampleHelper.h"
 
 #ifdef _MSC_VER
 #pragma comment(lib, "Irrlicht.lib")
@@ -94,17 +93,15 @@ int main()
 	ISceneManager *smgr = device->getSceneManager();
 	IVideoDriver *driver = device->getVideoDriver();
 
-	const io::path mediaPath = getExampleMediaPath();
-
 	//Load model
-	IAnimatedMesh *model = smgr->getMesh(mediaPath + "sydney.md2");
+	IAnimatedMesh *model = smgr->getMesh("../../media/sydney.md2");
 	if (!model)
 		return 1;
 	IAnimatedMeshSceneNode *model_node = smgr->addAnimatedMeshSceneNode(model);
 	//Load texture
 	if (model_node)
 	{
-		ITexture *texture = driver->getTexture(mediaPath + "sydney.bmp");
+		ITexture *texture = driver->getTexture("../../media/sydney.bmp");
 		model_node->setMaterialTexture(0,texture);
 		model_node->setMD2Animation(scene::EMAT_RUN);
 		//Disable lighting (we've got no light)
@@ -112,7 +109,7 @@ int main()
 	}
 
 	//Load map
-	device->getFileSystem()->addFileArchive(mediaPath + "map-20kdm2.pk3");
+	device->getFileSystem()->addFileArchive("../../media/map-20kdm2.pk3");
 	IAnimatedMesh *map = smgr->getMesh("20kdm2.bsp");
 	if (map)
 	{
@@ -172,7 +169,7 @@ Sounds a little complicated, but you'll see it isn't:
 	{
 		//Set the viewpoint to the whole screen and begin scene
 		driver->setViewPort(rect<s32>(0,0,ResX,ResY));
-		driver->beginScene(video::ECBF_COLOR | video::ECBF_DEPTH, SColor(255,100,100,100));
+		driver->beginScene(true,true,SColor(255,100,100,100));
 		//If SplitScreen is used
 		if (SplitScreen)
 		{

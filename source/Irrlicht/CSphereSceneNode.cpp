@@ -65,7 +65,7 @@ void CSphereSceneNode::render()
 
 //! Removes a child from this scene node.
 //! Implemented here, to be able to remove the shadow properly, if there is one,
-//! or to remove attached child.
+//! or to remove attached childs.
 bool CSphereSceneNode::removeChild(ISceneNode* child)
 {
 	if (child && Shadow == child)

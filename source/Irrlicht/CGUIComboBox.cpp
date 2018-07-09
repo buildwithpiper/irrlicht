@@ -24,8 +24,7 @@ CGUIComboBox::CGUIComboBox(IGUIEnvironment* environment, IGUIElement* parent,
 	s32 id, core::rect<s32> rectangle)
 	: IGUIComboBox(environment, parent, id, rectangle),
 	ListButton(0), SelectedText(0), ListBox(0), LastFocus(0),
-	Selected(-1), HAlign(EGUIA_UPPERLEFT), VAlign(EGUIA_CENTER), MaxSelectionRows(5), HasFocus(false),
-	ActiveFont(0)
+	Selected(-1), HAlign(EGUIA_UPPERLEFT), VAlign(EGUIA_CENTER), MaxSelectionRows(5), HasFocus(false)
 {
 	#ifdef _DEBUG
 	setDebugName("CGUIComboBox");
@@ -95,7 +94,7 @@ void CGUIComboBox::setMaxSelectionRows(u32 max)
 	}
 }
 
-//! Get the maximal number of rows for the selection listbox
+//! Get the maximimal number of rows for the selection listbox
 u32 CGUIComboBox::getMaxSelectionRows() const
 {
 	return MaxSelectionRows;
@@ -385,16 +384,6 @@ void CGUIComboBox::draw()
 		return;
 
 	IGUISkin* skin = Environment->getSkin();
-
-	// font changed while the listbox is open?
-	if ( ActiveFont != skin->getFont() && ListBox )
-	{
-		// close and re-open to use new font-size
-		openCloseMenu();
-		openCloseMenu();
-	}
-
-
 	IGUIElement *currentFocus = Environment->getFocus();
 	if (currentFocus != LastFocus)
 	{
@@ -452,9 +441,9 @@ void CGUIComboBox::openCloseMenu()
 		if (h == 0)
 			h = 1;
 
-		ActiveFont = skin->getFont();
-		if (ActiveFont)
-			h *= (ActiveFont->getDimension(L"A").Height + 4);
+		IGUIFont* font = skin->getFont();
+		if (font)
+			h *= (font->getDimension(L"A").Height + 4);
 
 		// open list box
 		core::rect<s32> r(0, AbsoluteRect.getHeight(),

@@ -34,7 +34,7 @@ CLightSceneNode::CLightSceneNode(ISceneNode* parent, ISceneManager* mgr, s32 id,
 //! pre render event
 void CLightSceneNode::OnRegisterSceneNode()
 {
-	doLightRecalc();	// TODO: since doLightRecalc has now been added to updateAbsolutePosition it might be possible to remove this one.
+	doLightRecalc();
 
 	if (IsVisible)
 		SceneManager->registerNodeForRendering(this, ESNRP_LIGHT);
@@ -199,12 +199,6 @@ void CLightSceneNode::doLightRecalc()
 		BBox.reset( 0, 0, 0 );
 		setAutomaticCulling( scene::EAC_OFF );
 	}
-}
-
-void CLightSceneNode::updateAbsolutePosition()
-{
-	ILightSceneNode::updateAbsolutePosition();
-	doLightRecalc();
 }
 
 

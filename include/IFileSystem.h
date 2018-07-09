@@ -51,7 +51,7 @@ public:
 	The returned pointer should be dropped when no longer needed.
 	See IReferenceCounted::drop() for more information.
 	*/
-	virtual IReadFile* createMemoryReadFile(const void* memory, s32 len, const path& fileName, bool deleteMemoryWhenDropped=false) =0;
+	virtual IReadFile* createMemoryReadFile(void* memory, s32 len, const path& fileName, bool deleteMemoryWhenDropped=false) =0;
 
 	//! Creates an IReadFile interface for accessing files inside files.
 	/** This is useful e.g. for archives.
@@ -315,7 +315,7 @@ public:
 
 	//! Determines if a file exists and could be opened.
 	/** \param filename is the string identifying the file which should be tested for existence.
-	\return True if file exists, and false if it does not exist or an error occurred. */
+	\return True if file exists, and false if it does not exist or an error occured. */
 	virtual bool existFile(const path& filename) const =0;
 
 	//! Creates a XML Reader from a file which returns all parsed strings as wide characters (wchar_t*).

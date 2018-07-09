@@ -9,12 +9,6 @@
 
 namespace irr
 {
-
-namespace gui
-{
-	class IGUIFont;
-}
-
 namespace scene
 {
 
@@ -31,20 +25,8 @@ public:
 	//! sets the text string
 	virtual void setText(const wchar_t* text) = 0;
 
-	//! get the text string
-	virtual const wchar_t* getText() const = 0;
-
 	//! sets the color of the text
 	virtual void setTextColor(video::SColor color) = 0;
-
-	//! get the color of the text
-	virtual video::SColor getTextColor() const = 0;
-
-	//! set the font used to draw the text
-	virtual void setFont(gui::IGUIFont* font) = 0;
-
-	//! Get the font used to draw the text
-	virtual gui::IGUIFont* getFont() const = 0;
 };
 
 } // end namespace scene

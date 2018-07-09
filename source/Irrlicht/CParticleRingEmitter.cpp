@@ -3,9 +3,6 @@
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
 #include "CParticleRingEmitter.h"
-
-#ifdef _IRR_COMPILE_WITH_PARTICLES_
-
 #include "os.h"
 #include "IAttributes.h"
 
@@ -30,7 +27,7 @@ CParticleRingEmitter::CParticleRingEmitter(
 		MaxParticlesPerSecond(maxParticlesPerSecond),
 		MinStartColor(minStartColor), MaxStartColor(maxStartColor),
 		MinLifeTime(lifeTimeMin), MaxLifeTime(lifeTimeMax),
-		Time(0), MaxAngleDegrees(maxAngleDegrees)
+		Time(0), Emitted(0), MaxAngleDegrees(maxAngleDegrees)
 {
 	#ifdef _DEBUG
 	setDebugName("CParticleRingEmitter");
@@ -121,7 +118,7 @@ void CParticleRingEmitter::serializeAttributes(io::IAttributes* out, io::SAttrib
 	out->addFloat("MinStartSizeWidth", MinStartSize.Width);
 	out->addFloat("MinStartSizeHeight", MinStartSize.Height);
 	out->addFloat("MaxStartSizeWidth", MaxStartSize.Width);
-	out->addFloat("MaxStartSizeHeight", MaxStartSize.Height);
+	out->addFloat("MaxStartSizeHeight", MaxStartSize.Height); 
 	out->addInt("MinParticlesPerSecond", MinParticlesPerSecond);
 	out->addInt("MaxParticlesPerSecond", MaxParticlesPerSecond);
 	out->addColor("MinStartColor", MinStartColor);
@@ -135,8 +132,8 @@ void CParticleRingEmitter::serializeAttributes(io::IAttributes* out, io::SAttrib
 void CParticleRingEmitter::deserializeAttributes(io::IAttributes* in, io::SAttributeReadWriteOptions* options)
 {
 	Center = in->getAttributeAsVector3d("Center");
-	Radius = in->getAttributeAsFloat("Radius");
-	RingThickness = in->getAttributeAsFloat("RingThickness");
+	Radius = in->getAttributeAsFloat("Radius"); 
+	RingThickness = in->getAttributeAsFloat("RingThickness"); 
 
 	Direction = in->getAttributeAsVector3d("Direction");
 	if (Direction.getLength() == 0)
@@ -178,4 +175,3 @@ void CParticleRingEmitter::deserializeAttributes(io::IAttributes* in, io::SAttri
 } // end namespace scene
 } // end namespace irr
 
-#endif // _IRR_COMPILE_WITH_PARTICLES_

@@ -13,7 +13,6 @@
 #ifdef _IRR_COMPILE_WITH_OCT_LOADER_
 
 #include "COCTLoader.h"
-#include "CMeshTextureLoader.h"
 #include "IVideoDriver.h"
 #include "IFileSystem.h"
 #include "os.h"
@@ -36,8 +35,6 @@ COCTLoader::COCTLoader(ISceneManager* smgr, io::IFileSystem* fs)
 	#endif
 	if (FileSystem)
 		FileSystem->grab();
-
-	TextureLoader = new CMeshTextureLoader( FileSystem, SceneManager->getVideoDriver() );
 }
 
 
@@ -87,9 +84,6 @@ IAnimatedMesh* COCTLoader::createMesh(io::IReadFile* file)
 {
 	if (!file)
 		return 0;
-
-	if ( getMeshTextureLoader() )
-		getMeshTextureLoader()->setMeshFile(file);
 
 	octHeader header;
 	file->read(&header, sizeof(octHeader));
@@ -205,9 +199,16 @@ IAnimatedMesh* COCTLoader::createMesh(io::IReadFile* file)
 	tex.reallocate(header.numTextures + 1);
 	tex.push_back(0);
 
+	const core::stringc relpath = FileSystem->getFileDir(file->getFileName())+"/";
 	for (i = 1; i < (header.numTextures + 1); i++)
 	{
-		tex.push_back( getMeshTextureLoader() ? getMeshTextureLoader()->getTexture(textures[i-1].fileName) : NULL );
+		core::stringc path(textures[i-1].fileName);
+		path.replace('\\','/');
+		if (FileSystem->existFile(path))
+			tex.push_back(SceneManager->getVideoDriver()->getTexture(path));
+		else
+			// try to read in the relative path of the OCT file
+			tex.push_back(SceneManager->getVideoDriver()->getTexture( (relpath + path) ));
 	}
 
 	// prepare lightmaps

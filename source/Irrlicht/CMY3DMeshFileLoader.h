@@ -24,7 +24,9 @@
 
 
 #ifdef _MSC_VER
+#if _MSC_VER > 1000
 #pragma once
+#endif // _MSC_VER > 1000
 #endif
 
 
@@ -73,9 +75,9 @@ public:
 	CMY3DMeshFileLoader(ISceneManager *scmgr, io::IFileSystem* fs);
 	virtual ~CMY3DMeshFileLoader();
 
-	virtual bool isALoadableFileExtension(const io::path& filename) const _IRR_OVERRIDE_;
+	virtual bool isALoadableFileExtension(const io::path& filename) const;
 
-	virtual IAnimatedMesh* createMesh(io::IReadFile* file) _IRR_OVERRIDE_;
+	virtual IAnimatedMesh* createMesh(io::IReadFile* file);
 
 	//! getting access to the nodes (with transparent material), creating
 	//! while loading .my3d file

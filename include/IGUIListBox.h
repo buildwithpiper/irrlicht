@@ -13,7 +13,6 @@ namespace irr
 namespace gui
 {
 	class IGUISpriteBank;
-	class IGUIScrollBar;
 
 	//! Enumeration for listbox colors
 	enum EGUI_LISTBOX_COLOR
@@ -62,7 +61,7 @@ namespace gui
 		virtual void removeItem(u32 index) = 0;
 
 		//! get the the id of the item at the given absolute coordinates
-		/** \return The id of the list item or -1 when no item is at those coordinates*/
+		/** \return The id of the listitem or -1 when no item is at those coordinates*/
 		virtual s32 getItemAt(s32 xpos, s32 ypos) const = 0;
 
 		//! Returns the icon of an item
@@ -129,9 +128,6 @@ namespace gui
 
 		//! Sets whether to draw the background
 		virtual void setDrawBackground(bool draw) = 0;
-
-		//! Access the vertical scrollbar
-		virtual IGUIScrollBar* getVerticalScrollBar() const = 0;
 };
 
 

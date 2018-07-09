@@ -20,6 +20,8 @@
 					<Add option="-g" />
 					<Add option="-W" />
 					<Add option="-O0" />
+					<Add option="-Wno-unused-parameter" />
+					<Add option="-U__STRICT_ANSI__" />
 					<Add option="-DWIN32" />
 					<Add option="-D_DEBUG" />
 					<Add option="-D_WINDOWS" />
@@ -61,6 +63,8 @@
 					<Add option="-O2" />
 					<Add option="-Wall" />
 					<Add option="-W" />
+					<Add option="-Wno-unused-parameter" />
+					<Add option="-U__STRICT_ANSI__" />
 					<Add option="-DWIN32" />
 					<Add option="-DNDEBUG" />
 					<Add option="-D_WINDOWS" />
@@ -104,6 +108,8 @@
 					<Add option="-Wall" />
 					<Add option="-W" />
 					<Add option="-ffast-math" />
+					<Add option="-Wno-unused-parameter" />
+					<Add option="-U__STRICT_ANSI__" />
 					<Add option="-DWIN32" />
 					<Add option="-DNDEBUG" />
 					<Add option="-D_WINDOWS" />
@@ -142,19 +148,35 @@
 				<Option compiler="gcc" />
 				<Option createDefFile="1" />
 				<Compiler>
-					<Add option="-O3" />
 					<Add option="-Wextra" />
-					<Add option="-ffast-math" />
+					<Add option="-Wall" />
+					<Add option="-g" />
+					<Add option="-W" />
+					<Add option="-O0" />
+					<Add option="-Wno-unused-parameter" />
+					<Add option="-U__STRICT_ANSI__" />
+					<Add option="-DWIN32" />
+					<Add option="-D_DEBUG" />
+					<Add option="-D_WINDOWS" />
 					<Add option="-D_IRR_STATIC_LIB_" />
+					<Add option="-D_CRT_SECURE_NO_DEPRECATE" />
+					<Add option="-D__GNUWIN32__" />
 					<Add directory="../../include" />
 					<Add directory="zlib" />
-					<Add directory="libpng" />
 				</Compiler>
 				<Linker>
-					<Add library="GL" />
-					<Add library="Xxf86vm" />
-					<Add directory="/usr/X11R6/lib" />
-					<Add directory="/usr/local/lib" />
+					<Add library="kernel32" />
+					<Add library="user32" />
+					<Add library="gdi32" />
+					<Add library="winspool" />
+					<Add library="comdlg32" />
+					<Add library="advapi32" />
+					<Add library="shell32" />
+					<Add library="ole32" />
+					<Add library="oleaut32" />
+					<Add library="uuid" />
+					<Add library="opengl32" />
+					<Add library="winmm" />
 				</Linker>
 			</Target>
 			<Target title="Win32 - Release - accurate math - static">
@@ -171,6 +193,8 @@
 					<Add option="-O2" />
 					<Add option="-Wall" />
 					<Add option="-W" />
+					<Add option="-Wno-unused-parameter" />
+					<Add option="-U__STRICT_ANSI__" />
 					<Add option="-DWIN32" />
 					<Add option="-DNDEBUG" />
 					<Add option="-D_WINDOWS" />
@@ -211,6 +235,8 @@
 					<Add option="-Wall" />
 					<Add option="-W" />
 					<Add option="-ffast-math" />
+					<Add option="-Wno-unused-parameter" />
+					<Add option="-U__STRICT_ANSI__" />
 					<Add option="-DWIN32" />
 					<Add option="-DNDEBUG" />
 					<Add option="-D_WINDOWS" />
@@ -250,6 +276,9 @@
 					<Add option="-fPIC" />
 					<Add option="-g" />
 					<Add option="-O0" />
+					<Add option="-Wno-unused-parameter" />
+					<Add option="-fno-exceptions" />
+					<Add option="-U__STRICT_ANSI__" />
 					<Add option="-D_DEBUG" />
 					<Add directory="../../include" />
 					<Add directory="zlib" />
@@ -275,6 +304,9 @@
 					<Add option="-O3" />
 					<Add option="-Wextra" />
 					<Add option="-fPIC" />
+					<Add option="-Wno-unused-parameter" />
+					<Add option="-fno-exceptions" />
+					<Add option="-U__STRICT_ANSI__" />
 					<Add directory="../../include" />
 					<Add directory="zlib" />
 					<Add directory="libpng" />
@@ -299,7 +331,10 @@
 					<Add option="-O3" />
 					<Add option="-Wextra" />
 					<Add option="-fPIC" />
+					<Add option="-Wno-unused-parameter" />
 					<Add option="-ffast-math" />
+					<Add option="-fno-exceptions" />
+					<Add option="-U__STRICT_ANSI__" />
 					<Add directory="../../include" />
 					<Add directory="zlib" />
 					<Add directory="libpng" />
@@ -325,6 +360,9 @@
 					<Add option="-Wall" />
 					<Add option="-g" />
 					<Add option="-O0" />
+					<Add option="-Wno-unused-parameter" />
+					<Add option="-fno-exceptions" />
+					<Add option="-U__STRICT_ANSI__" />
 					<Add option="-D_IRR_STATIC_LIB_" />
 					<Add option="-D_DEBUG" />
 					<Add directory="../../include" />
@@ -349,7 +387,9 @@
 				<Compiler>
 					<Add option="-O3" />
 					<Add option="-Wextra" />
+					<Add option="-Wno-unused-parameter" />
 					<Add option="-fno-exceptions" />
+					<Add option="-U__STRICT_ANSI__" />
 					<Add option="-D_IRR_STATIC_LIB_" />
 					<Add directory="../../include" />
 					<Add directory="zlib" />
@@ -373,7 +413,10 @@
 				<Compiler>
 					<Add option="-O3" />
 					<Add option="-Wextra" />
+					<Add option="-Wno-unused-parameter" />
 					<Add option="-ffast-math" />
+					<Add option="-fno-exceptions" />
+					<Add option="-U__STRICT_ANSI__" />
 					<Add option="-D_IRR_STATIC_LIB_" />
 					<Add directory="../../include" />
 					<Add directory="zlib" />
@@ -390,13 +433,6 @@
 		<VirtualTargets>
 			<Add alias="All" targets="Win32 - Debug - dll;Win32 - Release - accurate math - dll;Win32 - Release - fast math - dll;" />
 		</VirtualTargets>
-		<Compiler>
-			<Add option="-Wno-unused-parameter" />
-			<Add option="-fno-exceptions" />
-			<Add option="-fno-rtti" />
-			<Add option="-fstrict-aliasing" />
-			<Add option="-U__STRICT_ANSI__" />
-		</Compiler>
 		<Unit filename="../../changes.txt" />
 		<Unit filename="../../include/CDynamicMeshBuffer.h" />
 		<Unit filename="../../include/CIndexBuffer.h" />
@@ -408,7 +444,6 @@
 		<Unit filename="../../include/EDeviceTypes.h" />
 		<Unit filename="../../include/EDriverFeatures.h" />
 		<Unit filename="../../include/EDriverTypes.h" />
-		<Unit filename="../../include/EFocusFlags.h" />
 		<Unit filename="../../include/EGUIAlignment.h" />
 		<Unit filename="../../include/EGUIElementTypes.h" />
 		<Unit filename="../../include/EHardwareBufferFlags.h" />
@@ -432,7 +467,6 @@
 		<Unit filename="../../include/IBoneSceneNode.h" />
 		<Unit filename="../../include/ICameraSceneNode.h" />
 		<Unit filename="../../include/IColladaMeshWriter.h" />
-		<Unit filename="../../include/IContextManager.h" />
 		<Unit filename="../../include/ICursorControl.h" />
 		<Unit filename="../../include/IDummyTransformationSceneNode.h" />
 		<Unit filename="../../include/IDynamicMeshBuffer.h" />
@@ -458,7 +492,6 @@
 		<Unit filename="../../include/IGUIInOutFader.h" />
 		<Unit filename="../../include/IGUIListBox.h" />
 		<Unit filename="../../include/IGUIMeshViewer.h" />
-		<Unit filename="../../include/IGUIProfiler.h" />
 		<Unit filename="../../include/IGUIScrollBar.h" />
 		<Unit filename="../../include/IGUISkin.h" />
 		<Unit filename="../../include/IGUISpinBox.h" />
@@ -485,11 +518,9 @@
 		<Unit filename="../../include/IMeshLoader.h" />
 		<Unit filename="../../include/IMeshManipulator.h" />
 		<Unit filename="../../include/IMeshSceneNode.h" />
-		<Unit filename="../../include/IMeshTextureLoader.h" />
 		<Unit filename="../../include/IMeshWriter.h" />
 		<Unit filename="../../include/IMetaTriangleSelector.h" />
 		<Unit filename="../../include/IOSOperator.h" />
-		<Unit filename="../../include/IOctreeSceneNode.h" />
 		<Unit filename="../../include/IParticleAffector.h" />
 		<Unit filename="../../include/IParticleAnimatedMeshSceneNodeEmitter.h" />
 		<Unit filename="../../include/IParticleAttractionAffector.h" />
@@ -503,12 +534,10 @@
 		<Unit filename="../../include/IParticleRotationAffector.h" />
 		<Unit filename="../../include/IParticleSphereEmitter.h" />
 		<Unit filename="../../include/IParticleSystemSceneNode.h" />
-		<Unit filename="../../include/IProfiler.h" />
 		<Unit filename="../../include/IQ3LevelMesh.h" />
 		<Unit filename="../../include/IQ3Shader.h" />
 		<Unit filename="../../include/IReadFile.h" />
 		<Unit filename="../../include/IReferenceCounted.h" />
-		<Unit filename="../../include/IRenderTarget.h" />
 		<Unit filename="../../include/ISceneCollisionManager.h" />
 		<Unit filename="../../include/ISceneLoader.h" />
 		<Unit filename="../../include/ISceneManager.h" />
@@ -551,7 +580,6 @@
 		<Unit filename="../../include/SMeshBuffer.h" />
 		<Unit filename="../../include/SMeshBufferLightMap.h" />
 		<Unit filename="../../include/SMeshBufferTangents.h" />
-		<Unit filename="../../include/SOverrideMaterial.h" />
 		<Unit filename="../../include/SParticle.h" />
 		<Unit filename="../../include/SSharedMeshBuffer.h" />
 		<Unit filename="../../include/SSkinMeshBuffer.h" />
@@ -575,7 +603,6 @@
 		<Unit filename="../../include/irrlicht.h" />
 		<Unit filename="../../include/irrpack.h" />
 		<Unit filename="../../include/irrunpack.h" />
-		<Unit filename="../../include/leakHunter.h" />
 		<Unit filename="../../include/line2d.h" />
 		<Unit filename="../../include/line3d.h" />
 		<Unit filename="../../include/matrix4.h" />
@@ -604,8 +631,6 @@
 		<Unit filename="CAttributes.h" />
 		<Unit filename="CB3DMeshFileLoader.cpp" />
 		<Unit filename="CB3DMeshFileLoader.h" />
-		<Unit filename="CB3DMeshWriter.cpp" />
-		<Unit filename="CB3DMeshWriter.h" />
 		<Unit filename="CBSPMeshFileLoader.cpp" />
 		<Unit filename="CBSPMeshFileLoader.h" />
 		<Unit filename="CBillboardSceneNode.cpp" />
@@ -618,6 +643,8 @@
 		<Unit filename="CCSMLoader.h" />
 		<Unit filename="CCameraSceneNode.cpp" />
 		<Unit filename="CCameraSceneNode.h" />
+		<Unit filename="CCgMaterialRenderer.cpp" />
+		<Unit filename="CCgMaterialRenderer.h" />
 		<Unit filename="CColladaFileLoader.cpp" />
 		<Unit filename="CColladaFileLoader.h" />
 		<Unit filename="CColladaMeshWriter.cpp" />
@@ -626,6 +653,19 @@
 		<Unit filename="CColorConverter.h" />
 		<Unit filename="CCubeSceneNode.cpp" />
 		<Unit filename="CCubeSceneNode.h" />
+		<Unit filename="CD3D8Driver.cpp" />
+		<Unit filename="CD3D8Driver.h" />
+		<Unit filename="CD3D8MaterialRenderer.h" />
+		<Unit filename="CD3D8NormalMapRenderer.cpp" />
+		<Unit filename="CD3D8NormalMapRenderer.h" />
+		<Unit filename="CD3D8ParallaxMapRenderer.cpp" />
+		<Unit filename="CD3D8ParallaxMapRenderer.h" />
+		<Unit filename="CD3D8ShaderMaterialRenderer.cpp" />
+		<Unit filename="CD3D8ShaderMaterialRenderer.h" />
+		<Unit filename="CD3D8Texture.cpp" />
+		<Unit filename="CD3D8Texture.h" />
+		<Unit filename="CD3D9CgMaterialRenderer.cpp" />
+		<Unit filename="CD3D9CgMaterialRenderer.h" />
 		<Unit filename="CD3D9Driver.cpp" />
 		<Unit filename="CD3D9Driver.h" />
 		<Unit filename="CD3D9HLSLMaterialRenderer.cpp" />
@@ -635,8 +675,6 @@
 		<Unit filename="CD3D9NormalMapRenderer.h" />
 		<Unit filename="CD3D9ParallaxMapRenderer.cpp" />
 		<Unit filename="CD3D9ParallaxMapRenderer.h" />
-		<Unit filename="CD3D9RenderTarget.cpp" />
-		<Unit filename="CD3D9RenderTarget.h" />
 		<Unit filename="CD3D9ShaderMaterialRenderer.cpp" />
 		<Unit filename="CD3D9ShaderMaterialRenderer.h" />
 		<Unit filename="CD3D9Texture.cpp" />
@@ -661,8 +699,6 @@
 		<Unit filename="CFileList.h" />
 		<Unit filename="CFileSystem.cpp" />
 		<Unit filename="CFileSystem.h" />
-		<Unit filename="CGLXManager.cpp" />
-		<Unit filename="CGLXManager.h" />
 		<Unit filename="CGUIButton.cpp" />
 		<Unit filename="CGUIButton.h" />
 		<Unit filename="CGUICheckBox.cpp" />
@@ -697,8 +733,6 @@
 		<Unit filename="CGUIMessageBox.h" />
 		<Unit filename="CGUIModalScreen.cpp" />
 		<Unit filename="CGUIModalScreen.h" />
-		<Unit filename="CGUIProfiler.cpp" />
-		<Unit filename="CGUIProfiler.h" />
 		<Unit filename="CGUIScrollBar.cpp" />
 		<Unit filename="CGUIScrollBar.h" />
 		<Unit filename="CGUISkin.cpp" />
@@ -737,8 +771,6 @@
 		<Unit filename="CImageLoaderPPM.h" />
 		<Unit filename="CImageLoaderPSD.cpp" />
 		<Unit filename="CImageLoaderPSD.h" />
-		<Unit filename="CImageLoaderPVR.cpp" />
-		<Unit filename="CImageLoaderPVR.h" />
 		<Unit filename="CImageLoaderRGB.cpp" />
 		<Unit filename="CImageLoaderRGB.h" />
 		<Unit filename="CImageLoaderTGA.cpp" />
@@ -769,6 +801,8 @@
 		<Unit filename="CIrrDeviceStub.h" />
 		<Unit filename="CIrrDeviceWin32.cpp" />
 		<Unit filename="CIrrDeviceWin32.h" />
+		<Unit filename="CIrrDeviceWinCE.cpp" />
+		<Unit filename="CIrrDeviceWinCE.h" />
 		<Unit filename="CIrrMeshFileLoader.cpp" />
 		<Unit filename="CIrrMeshFileLoader.h" />
 		<Unit filename="CIrrMeshWriter.cpp" />
@@ -800,8 +834,6 @@
 		<Unit filename="CMeshManipulator.h" />
 		<Unit filename="CMeshSceneNode.cpp" />
 		<Unit filename="CMeshSceneNode.h" />
-		<Unit filename="CMeshTextureLoader.cpp" />
-		<Unit filename="CMeshTextureLoader.h" />
 		<Unit filename="CMetaTriangleSelector.cpp" />
 		<Unit filename="CMetaTriangleSelector.h" />
 		<Unit filename="CMountPointReader.cpp" />
@@ -824,13 +856,8 @@
 		<Unit filename="COctreeTriangleSelector.h" />
 		<Unit filename="COgreMeshFileLoader.cpp" />
 		<Unit filename="COgreMeshFileLoader.h" />
-		<Unit filename="COpenGLCacheHandler.cpp" />
-		<Unit filename="COpenGLCacheHandler.h" />
-		<Unit filename="COpenGLCommon.h" />
-		<Unit filename="COpenGLCoreCacheHandler.h" />
-		<Unit filename="COpenGLCoreFeature.h" />
-		<Unit filename="COpenGLCoreRenderTarget.h" />
-		<Unit filename="COpenGLCoreTexture.h" />
+		<Unit filename="COpenGLCgMaterialRenderer.cpp" />
+		<Unit filename="COpenGLCgMaterialRenderer.h" />
 		<Unit filename="COpenGLDriver.cpp" />
 		<Unit filename="COpenGLDriver.h" />
 		<Unit filename="COpenGLExtensionHandler.cpp" />
@@ -844,6 +871,8 @@
 		<Unit filename="COpenGLSLMaterialRenderer.h" />
 		<Unit filename="COpenGLShaderMaterialRenderer.cpp" />
 		<Unit filename="COpenGLShaderMaterialRenderer.h" />
+		<Unit filename="COpenGLTexture.cpp" />
+		<Unit filename="COpenGLTexture.h" />
 		<Unit filename="CPLYMeshFileLoader.cpp" />
 		<Unit filename="CPLYMeshFileLoader.h" />
 		<Unit filename="CPLYMeshWriter.cpp" />
@@ -876,8 +905,6 @@
 		<Unit filename="CParticleSphereEmitter.h" />
 		<Unit filename="CParticleSystemSceneNode.cpp" />
 		<Unit filename="CParticleSystemSceneNode.h" />
-		<Unit filename="CProfiler.cpp" />
-		<Unit filename="CProfiler.h" />
 		<Unit filename="CQ3LevelMesh.cpp" />
 		<Unit filename="CQ3LevelMesh.h" />
 		<Unit filename="CQuake3ShaderSceneNode.cpp" />
@@ -983,8 +1010,6 @@
 		<Unit filename="CVolumeLightSceneNode.h" />
 		<Unit filename="CWADReader.cpp" />
 		<Unit filename="CWADReader.h" />
-		<Unit filename="CWGLManager.cpp" />
-		<Unit filename="CWGLManager.h" />
 		<Unit filename="CWaterSurfaceSceneNode.cpp" />
 		<Unit filename="CWaterSurfaceSceneNode.h" />
 		<Unit filename="CWriteFile.cpp" />
@@ -1000,7 +1025,6 @@
 		<Unit filename="CZBuffer.h" />
 		<Unit filename="CZipReader.cpp" />
 		<Unit filename="CZipReader.h" />
-		<Unit filename="EProfileIDs.h" />
 		<Unit filename="IAttribute.h" />
 		<Unit filename="IBurningShader.cpp" />
 		<Unit filename="IBurningShader.h" />
@@ -1009,10 +1033,11 @@
 		<Unit filename="ITriangleRenderer.h" />
 		<Unit filename="IZBuffer.h" />
 		<Unit filename="Irrlicht.cpp" />
+		<Unit filename="MacOSX/CIrrDeviceMacOSX.h" />
+		<Unit filename="MacOSX/CIrrDeviceMacOSX.mm" />
 		<Unit filename="Octree.h" />
 		<Unit filename="S2DVertex.h" />
 		<Unit filename="S4DVertex.h" />
-		<Unit filename="SB3DStructs.h" />
 		<Unit filename="SoftwareDriver2_compile_config.h" />
 		<Unit filename="SoftwareDriver2_helper.h" />
 		<Unit filename="aesGladman/aes.h" />
@@ -1208,7 +1233,6 @@
 			<Option compilerVar="CC" />
 		</Unit>
 		<Unit filename="jpeglib/jversion.h" />
-		<Unit filename="leakHunter.cpp" />
 		<Unit filename="libpng/png.c">
 			<Option compilerVar="CC" />
 		</Unit>
@@ -1263,7 +1287,6 @@
 		<Unit filename="lzma/Types.h" />
 		<Unit filename="os.cpp" />
 		<Unit filename="os.h" />
-		<Unit filename="utf8.cpp" />
 		<Unit filename="zlib/adler32.c">
 			<Option compilerVar="CC" />
 		</Unit>
