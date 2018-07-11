@@ -1934,7 +1934,7 @@ void COpenGLDriver::draw2DImageBatch(const video::ITexture* texture,
 	setRenderStates2DMode(color.getAlpha()<255, true, useAlphaChannelOfTexture);
 
 	glColor4ub(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha());
-	glBegin(GL_TRIANGLE_FAN);
+	glBegin(GL_TRIANGLES);
 
 	for (u32 i=0; i<drawCount; ++i)
 	{
@@ -2034,6 +2034,12 @@ void COpenGLDriver::draw2DImageBatch(const video::ITexture* texture,
 
 		glTexCoord2f(tcoords.LowerRightCorner.X, tcoords.UpperLeftCorner.Y);
 		glVertex2f(GLfloat(poss.LowerRightCorner.X), GLfloat(poss.UpperLeftCorner.Y));
+
+		glTexCoord2f(tcoords.LowerRightCorner.X, tcoords.LowerRightCorner.Y);
+		glVertex2f(GLfloat(poss.LowerRightCorner.X), GLfloat(poss.LowerRightCorner.Y));
+
+		glTexCoord2f(tcoords.UpperLeftCorner.X, tcoords.UpperLeftCorner.Y);
+		glVertex2f(GLfloat(poss.UpperLeftCorner.X), GLfloat(poss.UpperLeftCorner.Y));
 
 		glTexCoord2f(tcoords.LowerRightCorner.X, tcoords.LowerRightCorner.Y);
 		glVertex2f(GLfloat(poss.LowerRightCorner.X), GLfloat(poss.LowerRightCorner.Y));
