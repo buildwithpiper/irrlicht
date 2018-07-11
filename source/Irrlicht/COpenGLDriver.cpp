@@ -1932,7 +1932,7 @@ void COpenGLDriver::draw2DImageBatch(const video::ITexture* texture,
 	setRenderStates2DMode(color.getAlpha()<255, true, useAlphaChannelOfTexture);
 
 	glColor4ub(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha());
-	glBegin(GL_QUADS);
+	glBegin(GL_TRIANGLE_FAN);
 
 	for (u32 i=0; i<drawCount; ++i)
 	{
@@ -2157,7 +2157,7 @@ void COpenGLDriver::draw2DImage(const video::ITexture* texture,
 	setRenderStates2DMode(color.getAlpha()<255, true, useAlphaChannelOfTexture);
 
 	glColor4ub(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha());
-	glBegin(GL_QUADS);
+	glBegin(GL_TRIANGLE_FAN);
 
 	glTexCoord2f(tcoords.UpperLeftCorner.X, tcoords.UpperLeftCorner.Y);
 	glVertex2f(GLfloat(poss.UpperLeftCorner.X), GLfloat(poss.UpperLeftCorner.Y));
@@ -2219,7 +2219,7 @@ void COpenGLDriver::draw2DImage(const video::ITexture* texture, const core::rect
 			clipRect->getWidth(), clipRect->getHeight());
 	}
 
-	glBegin(GL_QUADS);
+	glBegin(GL_TRIANGLE_FAN);
 
 	glColor4ub(useColor[0].getRed(), useColor[0].getGreen(), useColor[0].getBlue(), useColor[0].getAlpha());
 	glTexCoord2f(tcoords.UpperLeftCorner.X, tcoords.UpperLeftCorner.Y);
@@ -2295,7 +2295,7 @@ void COpenGLDriver::draw2DImage(const video::ITexture* texture,
 
 		const core::rect<s32> poss(targetPos, sourceRects[currentIndex].getSize());
 
-		glBegin(GL_QUADS);
+		glBegin(GL_TRIANGLE_FAN);
 
 		glTexCoord2f(tcoords.UpperLeftCorner.X, tcoords.UpperLeftCorner.Y);
 		glVertex2f(GLfloat(poss.UpperLeftCorner.X), GLfloat(poss.UpperLeftCorner.Y));
@@ -2321,6 +2321,7 @@ void COpenGLDriver::draw2DImage(const video::ITexture* texture,
 void COpenGLDriver::draw2DRectangle(SColor color, const core::rect<s32>& position,
 		const core::rect<s32>* clip)
 {
+#if 0
 	disableTextures();
 	setRenderStates2DMode(color.getAlpha() < 255, false, false);
 
@@ -2335,6 +2336,9 @@ void COpenGLDriver::draw2DRectangle(SColor color, const core::rect<s32>& positio
 	glColor4ub(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha());
 	glRectf(GLfloat(pos.UpperLeftCorner.X), GLfloat(pos.UpperLeftCorner.Y),
 		GLfloat(pos.LowerRightCorner.X), GLfloat(pos.LowerRightCorner.Y));
+#else
+	draw2DRectangle(position, color, color, color, color, clip);
+#endif
 }
 
 
@@ -2358,7 +2362,7 @@ void COpenGLDriver::draw2DRectangle(const core::rect<s32>& position,
 		colorLeftDown.getAlpha() < 255 ||
 		colorRightDown.getAlpha() < 255, false, false);
 
-	glBegin(GL_QUADS);
+	glBegin(GL_TRIANGLE_FAN);
 	glColor4ub(colorLeftUp.getRed(), colorLeftUp.getGreen(),
 		colorLeftUp.getBlue(), colorLeftUp.getAlpha());
 	glVertex2f(GLfloat(pos.UpperLeftCorner.X), GLfloat(pos.UpperLeftCorner.Y));
@@ -3740,7 +3744,7 @@ void COpenGLDriver::drawStencilShadow(bool clearStencilBuffer, video::SColor lef
 	glPushMatrix();
 	glLoadIdentity();
 
-	glBegin(GL_QUADS);
+	glBegin(GL_TRIANGLE_FAN);
 
 	glColor4ub(leftDownEdge.getRed(), leftDownEdge.getGreen(), leftDownEdge.getBlue(), leftDownEdge.getAlpha());
 	glVertex3f(-1.f,-1.f,-0.9f);
