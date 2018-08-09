@@ -636,6 +636,21 @@ namespace video
 			return setRenderTarget(texture, flag, color);
 		}
 
+		_IRR_DEPRECATED_ bool setRenderTarget(E_RENDER_TARGET target, bool clearTarget,
+					bool clearZBuffer,
+					SColor color)
+		{
+			u16 flag = 0;
+
+			if (clearTarget)
+				flag |= ECBF_COLOR;
+
+			if (clearZBuffer)
+				flag |= ECBF_DEPTH;
+
+			return setRenderTarget(0, flag, color);
+		}
+
 		//! Sets a new viewport.
 		/** Every rendering operation is done into this new area.
 		\param area: Rectangle defining the new area of rendering
