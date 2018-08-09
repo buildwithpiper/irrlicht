@@ -216,6 +216,11 @@ virtual void somefunc() _IRR_OVERRIDE_;
 #define _IRR_OVERRIDE_
 #endif
 
+// deprecated MSVC-only bugfix
+#ifndef _IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX
+#define _IRR_IMPLEMENT_MANAGED_MARSHALLING_BUGFIX
+#endif
+
 // memory debugging
 #if defined(_DEBUG) && defined(IRRLICHT_EXPORTS) && defined(_MSC_VER) && \
 	(_MSC_VER > 1299) && !defined(_IRR_DONT_DO_MEMORY_DEBUGGING_HERE) && !defined(_WIN32_WCE)
