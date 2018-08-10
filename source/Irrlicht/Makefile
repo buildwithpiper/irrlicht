@@ -68,6 +68,7 @@ emscripten: EMSCRIPTEN=1
 #Compiler flags
 
 CXXINCS = -I../../include -Izlib -Ijpeglib -Ilibpng
+CXXINCS += -I${EROOTFS}/opt/vc/include
 CPPFLAGS += $(CXXINCS) -DIRRLICHT_EXPORTS=1
 CXXFLAGS += -Wall -pipe -fno-exceptions -fno-rtti -fstrict-aliasing
 ifndef NDEBUG
@@ -104,8 +105,11 @@ endif
 #Linux specific options
 staticlib sharedlib install: SYSTEM = Linux
 sharedlib install: SHARED_LIB = libIrrlicht.so
-sharedlib: LDFLAGS += -L/usr/X11R6/lib$(LIBSELECT) -lGL -lXxf86vm
-staticlib sharedlib: CXXINCS += -I/usr/X11R6/include
+#sharedlib: LDFLAGS += -L/usr/X11R6/lib$(LIBSELECT) -lGL -lXxf86vm
+#sharedlib: CXXINCS += -I/usr/X11R6/include
+staticlib: CXXINCS += -I${EROOTFS}/opt/vc/include
+sharedlib: CXXINCS += -I${EROOTFS}/opt/vc/include
+sharedlib: LDFLAGS += -L${EROOTFS}/opt/vc/lib -Wl,-rpath-link=${EROOTFS}/opt/vc/lib -lbrcmEGL -lbrcmGLESv2 -lbcm_host -lvcos -lvchiq_arm
 
 #OSX specific options
 staticlib_osx sharedlib_osx install_osx: SYSTEM = MacOSX
