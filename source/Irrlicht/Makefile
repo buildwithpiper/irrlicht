@@ -109,7 +109,7 @@ sharedlib install: SHARED_LIB = libIrrlicht.so
 #sharedlib: CXXINCS += -I/usr/X11R6/include
 staticlib: CXXINCS += -I${EROOTFS}/usr/include
 sharedlib: CXXINCS += -I${EROOTFS}/usr/include
-sharedlib: LDFLAGS += -L${EROOTFS}/usr/lib -lEGL -lGLESv2
+sharedlib: LDFLAGS += -L${EROOTFS}/usr/lib -lEGL -lGLESv2 -lGLESv1_CM -lGL -lX11 -lXxf86vm
 
 #OSX specific options
 staticlib_osx sharedlib_osx install_osx: SYSTEM = MacOSX
